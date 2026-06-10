@@ -36,7 +36,7 @@ class Octave {
 export class Terrain {
   constructor(settings, seed) {
     this.seed = seed;
-    this.slope = 0.30 * settings.steepness;
+    this.slope = 0.40 * settings.steepness;
     const h = settings.hilliness;
     this.o1 = new Octave(180, 42 * h, seed);
     this.o2 = new Octave(680, 105 * h, seed ^ 0x5bd1e995);

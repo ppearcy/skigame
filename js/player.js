@@ -5,8 +5,8 @@ import { clamp, lerp, normAngle } from './config.js';
 // sound / particles / score.
 
 const MIN_SPEED = 150;
-const FLIP_ROT = Math.PI * 1.6;    // rotation counted as one full flip
-const CRASH_ANGLE = 1.25;          // landing tolerance (rad off the slope)
+const FLIP_ROT = Math.PI * 1.45;   // rotation counted as one full flip
+const CRASH_ANGLE = 1.35;          // landing tolerance (rad off the slope)
 
 export const MOUNTS = {
   penguin:    { label: '🐧 Penguin',    thrust: 175, jump: 1.18, height: 17 },
@@ -29,6 +29,7 @@ export class Player {
     this.airTime = 0;
     this.sinceGround = 0;    // coyote time
     this.crashTimer = 0;
+    this.grace = 0;          // post-crash invulnerability to rocks
     this.combo = 0;
     this.events = [];        // consumed by game each frame
   }
@@ -46,7 +47,7 @@ export class Player {
 
   press() {
     if (this.state === 'ground' || (this.state === 'air' && this.sinceGround < 0.09)) {
-      const power = 780 * this.jumpMult();
+      const power = 860 * this.jumpMult();
       this.vy -= power;
       this.state = 'air';
       this.airTime = 0;
@@ -71,17 +72,18 @@ export class Player {
   crash() {
     if (this.state === 'crash' || this.state === 'dead') return;
     this.state = 'crash';
-    this.crashTimer = 1.15;
+    this.crashTimer = 0.95;
     this.combo = 0;
     this.trickRot = 0;
-    this.vx *= 0.25;
-    this.vy = 0;
-    this.angVel = 11;
+    this.vx *= 0.3;
+    this.vy = -200;                       // thrown into the air by the impact
+    this.angVel = 9 + Math.random() * 5;  // violent forward tumble
     this.loseMount('crash');
     this.events.push({ type: 'crash' });
   }
 
   update(dt, held, terrain) {
+    this.grace = Math.max(0, this.grace - dt);
     switch (this.state) {
       case 'ground': this.updateGround(dt, terrain); break;
       case 'air':    this.updateAir(dt, held, terrain); break;
@@ -126,18 +128,18 @@ export class Player {
     this.sinceGround += dt;
 
     // held => wind up a backflip (counter-clockwise while travelling right)
-    const targetAV = held ? -10.5 : 0;
-    const ramp = held ? 30 : 24; // spin stops quickly on release for crisp timing
+    const targetAV = held ? -12.5 : 0;
+    const ramp = held ? 42 : 34; // fast wind-up, quick stop on release
     this.angVel += clamp(targetAV - this.angVel, -ramp * dt, ramp * dt);
     this.angle += this.angVel * dt;
     if (this.angVel < 0) this.trickRot += -this.angVel * dt;
 
     // gentle auto-level toward the slope once the spin has wound down,
     // so releasing in time recovers a slightly under-rotated flip
-    if (!held && Math.abs(this.angVel) < 2.5) {
+    if (!held && Math.abs(this.angVel) < 3.5) {
       const theta = Math.atan(terrain.slopeAt(this.x));
       const diff = normAngle(theta - this.angle);
-      const assist = 3.4 * dt;
+      const assist = 5.0 * dt;
       this.angle += clamp(diff, -assist, assist);
     }
 
@@ -182,13 +184,24 @@ export class Player {
 
   updateCrash(dt, terrain) {
     this.crashTimer -= dt;
-    this.vx = Math.max(this.vx - 900 * dt, 90);
+    // ragdoll: ballistic arc, bouncing and skidding down the slope
+    this.vx = Math.max(this.vx - 700 * dt, 70);
+    this.vy += this.grav * dt;
     this.x += this.vx * dt;
+    this.y += this.vy * dt;
     const gy = terrain.groundY(this.x);
-    this.y = Math.min(this.y + 500 * dt, gy);
-    this.angVel *= Math.exp(-3.2 * dt);
+    if (this.y >= gy) {
+      this.y = gy;
+      if (this.vy > 150) {
+        this.vy *= -0.38; // bounce off the snow
+        this.events.push({ type: 'tumble' });
+      } else {
+        this.vy = Math.min(this.vy, terrain.slopeAt(this.x) * this.vx);
+      }
+    }
+    this.angVel *= Math.exp(-1.8 * dt);
     this.angle += this.angVel * dt;
-    if (this.crashTimer <= 0) {
+    if (this.crashTimer <= 0 && this.y >= gy - 4) {
       const theta = Math.atan(terrain.slopeAt(this.x));
       this.state = 'ground';
       this.angle = theta;
@@ -196,6 +209,7 @@ export class Player {
       const spd = Math.max(this.vx, MIN_SPEED);
       this.vx = Math.cos(theta) * spd;
       this.vy = Math.sin(theta) * spd;
+      this.grace = 1.2;
       this.events.push({ type: 'recover' });
     }
   }

@@ -64,6 +64,7 @@ export class Sound {
     }
   }
   crash() { this.noise(0.4, { vol: 0.28, low: true }); this.tone(160, 0.3, { type: 'sawtooth', vol: 0.1, slide: -110 }); }
+  thud()  { this.noise(0.12, { vol: 0.13, low: true }); }
   mount() { this.tone(620, 0.09, { type: 'triangle', vol: 0.12 }); this.tone(930, 0.12, { type: 'triangle', vol: 0.12, delay: 0.08 }); }
   smash() { this.noise(0.25, { vol: 0.22 }); this.tone(110, 0.2, { type: 'square', vol: 0.1, slide: -60 }); }
   gameOver() {

@@ -3,7 +3,7 @@ import { Terrain } from './terrain.js';
 import { Player, MOUNTS } from './player.js';
 import { Entities } from './entities.js';
 import { Avalanche } from './avalanche.js';
-import { Background, THEMES, drawTerrain, drawEntity, drawPlayer, drawAvalanche } from './render.js';
+import { Background, THEMES, drawTerrain, drawEntity, drawPlayer, drawAvalanche, drawDebris } from './render.js';
 import { Sound } from './audio.js';
 import { UI } from './ui.js';
 
@@ -56,6 +56,7 @@ class Game {
     this.trickScore = 0;
     this.particles = [];
     this.floaters = [];
+    this.debris = [];
     this.trail = [];
     this.time = 0;
     this.shake = 0;
@@ -217,6 +218,17 @@ class Game {
           });
         }
       }
+    } else if (p.state === 'crash') {
+      // churned-up snow billowing around the tumbling skier
+      for (let i = 0; i < 3; i++) {
+        this.particles.push({
+          x: p.x + (Math.random() - 0.5) * 30, y: p.y - Math.random() * 18,
+          vx: -p.vx * 0.3 + (Math.random() - 0.5) * 160,
+          vy: -40 - Math.random() * 160,
+          life: 0.5 + Math.random() * 0.3, maxLife: 0.8,
+          size: 2.5 + Math.random() * 4, color: '#ffffff', grav: 500,
+        });
+      }
     }
 
     this.updateFx(dt);
@@ -247,7 +259,23 @@ class Game {
         case 'crash':
           this.sound.crash();
           this.shake = Math.max(this.shake, 13);
-          this.burst(p.x, p.y - 10, 20, '#ffffff', 320);
+          this.burst(p.x, p.y - 10, 24, '#ffffff', 360);
+          // skis rip off and tumble away
+          for (let k = 0; k < 2; k++) {
+            this.debris.push({
+              x: p.x, y: p.y - 4,
+              vx: p.vx * 0.6 + (Math.random() - 0.5) * 220,
+              vy: -260 - Math.random() * 200,
+              rot: p.angle, rotVel: (Math.random() - 0.5) * 24,
+              len: 48 + k * 9, life: 2.4, stuck: false,
+              color: this.settings.skiColor,
+            });
+          }
+          break;
+        case 'tumble': // each bounce off the snow during the ragdoll
+          this.sound.thud();
+          this.shake = Math.max(this.shake, 5);
+          this.burst(p.x, p.y - 4, 9, '#ffffff', 200);
           break;
         case 'mount':
           this.sound.mount();
@@ -282,7 +310,7 @@ class Game {
         this.sound.coin();
         this.burst(it.x, it.y, 6, '#ffd75e', 150);
       } else if (it.type === 'rock') {
-        if (p.state === 'crash') continue;
+        if (p.state === 'crash' || p.grace > 0) continue;
         it.dead = true;
         if (p.mount === 'yeti') {
           this.trickScore += 50;
@@ -320,6 +348,25 @@ class Game {
       f.y -= 46 * dt;
     }
     this.floaters = this.floaters.filter(f => f.life > 0);
+
+    // loose skis: fly, spin, then stick in the snow and fade
+    for (const d of this.debris) {
+      if (d.stuck) {
+        d.life -= dt;
+        continue;
+      }
+      d.vy += 1900 * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.rot += d.rotVel * dt;
+      const gy = this.terrain.groundY(d.x);
+      if (d.y >= gy - 2) {
+        d.y = gy - 2;
+        d.stuck = true;
+        d.rot = Math.atan(this.terrain.slopeAt(d.x)) + (Math.random() - 0.5) * 0.9;
+      }
+    }
+    this.debris = this.debris.filter(d => d.life > 0);
 
     this.shake = Math.max(0, this.shake - 34 * dt);
   }
@@ -395,6 +442,8 @@ class Game {
       if (it.dead || it.x < left || it.x > right) continue;
       drawEntity(ctx, it, this.time, theme);
     }
+
+    for (const d of this.debris) drawDebris(ctx, d);
 
     if (this.player.state !== 'dead' || !this.deathCaught) {
       drawPlayer(ctx, this.player, this.settings, this.time);

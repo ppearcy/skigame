@@ -25,7 +25,7 @@ export class Entities {
     if (this.s.rocks > 0.05) {
       while (this.nextRock < spawnTo) {
         this.spawnRock(this.nextRock);
-        this.nextRock += this.rand(750, 2300) / this.s.rocks;
+        this.nextRock += this.rand(900, 2600) / this.s.rocks;
       }
     }
     if (this.s.coins > 0.05) {

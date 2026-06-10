@@ -132,8 +132,8 @@ for (let round = 0; round < 30; round++) {
   pump(32);
   if (game.player.state === 'crash') crashes++;
   // like a human would: ski clean until the avalanche gap is safe again
-  let safety = 20;
-  while (game.avalanche.distanceTo(game.player) < 700 && safety-- > 0) pump(10);
+  let safety = 40;
+  while (game.avalanche.distanceTo(game.player) < 900 && safety-- > 0) pump(10);
   if (game.state !== 'playing') break;
 }
 assert.ok(sawAir, 'jumping should put the player in the air');

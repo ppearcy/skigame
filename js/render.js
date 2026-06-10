@@ -386,6 +386,7 @@ export function drawPlayer(ctx, p, settings, time) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(p.angle);
+  if (p.grace > 0) ctx.globalAlpha = 0.55 + 0.4 * Math.sin(time * 22); // blink
 
   if (p.mount) {
     switch (p.mount) {
@@ -401,6 +402,10 @@ export function drawPlayer(ctx, p, settings, time) {
 }
 
 function drawSkier(ctx, s, p, time) {
+  if (p.state === 'crash') {
+    drawCrashedSkier(ctx, s, time);
+    return;
+  }
   const crouch = p.state === 'air' ? 2 : 0;
   const onSkis = !p.mount || p.mount === 'penguin' || p.mount === 'yeti';
 
@@ -469,6 +474,69 @@ function drawSkier(ctx, s, p, time) {
   ctx.fill();
   ctx.fillStyle = '#243447';
   ctx.fillRect(11, -33 + crouch, 6.5, 3.4);
+}
+
+// ragdoll pose: limbs flailing, skis gone (they fly off as debris)
+function drawCrashedSkier(ctx, s, time) {
+  const flail = Math.sin(time * 26);
+  ctx.lineCap = 'round';
+
+  // legs kicked out at different angles
+  ctx.strokeStyle = '#27384c';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-1, -10); ctx.lineTo(-13, -2 + flail * 3);
+  ctx.moveTo(1, -10); ctx.lineTo(12, 0 - flail * 3);
+  ctx.stroke();
+
+  // body horizontal-ish
+  ctx.strokeStyle = s.suitColor;
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  ctx.moveTo(-4, -12); ctx.lineTo(8, -18);
+  ctx.stroke();
+
+  // arms thrown wide
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -15); ctx.lineTo(-11, -24 + flail * 2);
+  ctx.moveTo(5, -17); ctx.lineTo(15, -26 - flail * 2);
+  ctx.stroke();
+
+  // scarf whipping around
+  ctx.strokeStyle = s.scarfColor;
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(10, -20);
+  ctx.quadraticCurveTo(2 + flail * 3, -30, -8 + flail * 5, -27);
+  ctx.stroke();
+
+  // head
+  ctx.fillStyle = '#f0c8a0';
+  ctx.beginPath();
+  ctx.arc(12, -21, 5.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = s.suitColor;
+  ctx.beginPath();
+  ctx.arc(12, -22, 5.8, Math.PI * 0.9, Math.PI * 1.97);
+  ctx.fill();
+}
+
+// loose skis tumbling away after a crash
+export function drawDebris(ctx, d) {
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.rotate(d.rot);
+  ctx.globalAlpha = Math.min(d.life / 0.5, 1);
+  ctx.strokeStyle = d.color;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-d.len / 2, 0);
+  ctx.lineTo(d.len / 2, 0);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 // ----------------------------------------------------------------- avalanche

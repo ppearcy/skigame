@@ -19,12 +19,14 @@ export class Avalanche {
     const ps = moving ? Math.max(player.vx, 0) : 0;
     this.ema += (ps - this.ema) * Math.min(1, dt * 0.5);
 
-    const desired = 1050 / this.aggr;          // comfortable trailing gap
+    // trailing gap scales with speed (~1.15s behind) so one full-speed crash
+    // is survivable but a quick second one is not
+    const desired = Math.max(700, this.ema * 1.15) / this.aggr;
     const dist = this.distanceTo(player);
     let spd = this.ema * 0.98
       + (dist - desired) * 0.45 * this.aggr    // rubber band
       + 45 * this.aggr
-      + (moving ? 0 : 390 * this.aggr);        // surge while the skier tumbles
+      + (moving ? 0 : 240 * this.aggr);        // surge while the skier tumbles
     this.speed = clamp(spd, 200, this.ema * 1.9 + 500);
     this.front += this.speed * dt;
   }
