@@ -426,16 +426,21 @@ class Game {
     const right = this.cam.x + w / z + 60;
     const bottom = this.cam.y + h / z + 80;
 
-    drawTerrain(ctx, this.terrain, theme, left, right, bottom);
+    drawTerrain(ctx, this.terrain, theme, left, right, bottom, this.time);
 
-    // ski trail
+    // ski trail, fading out behind the skier
     if (this.trail.length > 1) {
-      ctx.strokeStyle = 'rgba(140,170,200,0.35)';
+      ctx.strokeStyle = 'rgba(140,170,200,1)';
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(this.trail[0].x, this.trail[0].y);
-      for (const t of this.trail) ctx.lineTo(t.x, t.y);
-      ctx.stroke();
+      ctx.lineCap = 'round';
+      for (let i = 1; i < this.trail.length; i++) {
+        ctx.globalAlpha = (i / this.trail.length) * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(this.trail[i - 1].x, this.trail[i - 1].y);
+        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     }
 
     for (const it of this.entities.items) {
@@ -481,6 +486,36 @@ class Game {
     if (this.settings.snowfall) {
       this.bg.drawSnowfall(ctx, w, h, dt, this.player ? this.player.vx : 0);
     }
+
+    // faint speed streaks once you're really moving
+    if (!this.demo && this.player.speed > 1050 && this.state === 'playing') {
+      const boost = clamp((this.player.speed - 1050) / 900, 0, 1);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineCap = 'round';
+      for (let k = 0; k < 7; k++) {
+        const len = 80 + (k % 3) * 45;
+        const sx = w - (((this.time * 1500 + k * 331) % (w + len + 120)) - len);
+        const sy = h * (0.08 + ((k * 0.137) % 0.84));
+        ctx.globalAlpha = 0.05 + boost * 0.06;
+        ctx.lineWidth = 2 + (k % 2);
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + len, sy);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // soft vignette to focus the action
+    if (!this._vig || this._vigW !== w || this._vigH !== h) {
+      this._vig = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.hypot(w, h) * 0.62);
+      this._vig.addColorStop(0, 'rgba(10,20,45,0)');
+      this._vig.addColorStop(1, 'rgba(10,20,45,0.24)');
+      this._vigW = w;
+      this._vigH = h;
+    }
+    ctx.fillStyle = this._vig;
+    ctx.fillRect(0, 0, w, h);
 
     if (this.state === 'playing' && !this.demo) {
       const dist = this.avalanche.distanceTo(this.player);

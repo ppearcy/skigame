@@ -3,27 +3,34 @@ import { MOUNTS } from './player.js';
 
 export const THEMES = {
   day: {
-    skyTop: '#7cc4ef', skyBot: '#dff2fd',
-    ridgeFar: '#bcdcf0', ridgeNear: '#9cc6e4',
-    snow: '#ffffff', snowDeep: '#d4e8f5', snowLine: '#ffffff',
+    skyTop: '#3f9ce4', skyMid: '#8ecdf4', skyBot: '#eef9ff',
+    haze: 'rgba(255,255,255,0.55)',
+    ridgeFar: '#d3e8f6', ridgeMid: '#b6d8ec', ridgeNear: '#97c4e1',
+    snow: '#ffffff', snowDeep: '#cfe5f2', snowLine: '#ffffff',
+    snowShadow: 'rgba(125,165,205,0.30)',
     tree: '#2e6b4f', treeSnow: '#eef8ff',
     sun: '#fff6c9', stars: false,
     avalanche: '#f4fbff', avalancheShade: '#c2dcef',
   },
   sunset: {
-    skyTop: '#3d2a63', skyBot: '#ff9d6e',
-    ridgeFar: '#8d6a9e', ridgeNear: '#6d4f86',
-    snow: '#ffe3d1', snowDeep: '#d8a8a0', snowLine: '#fff1e6',
-    tree: '#3a3354', treeSnow: '#ffd9c4',
+    skyTop: '#2c1b54', skyMid: '#a4467c', skyBot: '#ffb46e',
+    haze: 'rgba(255,170,110,0.45)',
+    ridgeFar: '#a576ab', ridgeMid: '#855c97', ridgeNear: '#634382',
+    snow: '#ffe7d6', snowDeep: '#d8a8a0', snowLine: '#fff3e8',
+    snowShadow: 'rgba(150,90,115,0.30)',
+    tree: '#3a3354', treeSnow: '#ffdfca',
     sun: '#ffb45e', stars: false,
     avalanche: '#ffe9da', avalancheShade: '#d9a795',
   },
   night: {
-    skyTop: '#060d24', skyBot: '#1c3257',
-    ridgeFar: '#26395c', ridgeNear: '#1b2c4a',
-    snow: '#bcd2ec', snowDeep: '#8aa6c9', snowLine: '#dcebff',
-    tree: '#152a3a', treeSnow: '#bcd2ec',
+    skyTop: '#04081c', skyMid: '#0d1d3f', skyBot: '#23406b',
+    haze: 'rgba(120,160,220,0.28)',
+    ridgeFar: '#2c4166', ridgeMid: '#213450', ridgeNear: '#172741',
+    snow: '#c3d8ef', snowDeep: '#8aa6c9', snowLine: '#e2efff',
+    snowShadow: 'rgba(40,70,120,0.35)',
+    tree: '#152a3a', treeSnow: '#c3d8ef',
     sun: '#f4f6ff', stars: true,
+    aurora: ['#46f0b0', '#5ab2ff', '#b07bff'],
     avalanche: '#d4e4f7', avalancheShade: '#93accc',
   },
 };
@@ -39,8 +46,12 @@ export class Background {
     this.clouds = Array.from({ length: 7 }, () => ({
       x: rng(), y: 0.08 + rng() * 0.3, s: 0.6 + rng() * 1.1, drift: 4 + rng() * 8,
     }));
-    // two parallax ridge polylines (heights in 0..1 of screen)
-    this.ridges = [this.makeRidge(rng, 0.32), this.makeRidge(rng, 0.45)];
+    // three parallax ridge polylines (heights in 0..1 of screen)
+    this.ridges = [
+      this.makeRidge(rng, 0.30),
+      this.makeRidge(rng, 0.38),
+      this.makeRidge(rng, 0.46),
+    ];
     this.flakes = Array.from({ length: 130 }, () => ({
       x: rng(), y: rng(), s: 1 + rng() * 2.2, w: rng() * Math.PI * 2,
     }));
@@ -59,6 +70,7 @@ export class Background {
   drawSky(ctx, w, h, theme, time) {
     const g = ctx.createLinearGradient(0, 0, 0, h);
     g.addColorStop(0, theme.skyTop);
+    g.addColorStop(0.55, theme.skyMid);
     g.addColorStop(1, theme.skyBot);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
@@ -71,28 +83,66 @@ export class Background {
         ctx.fillRect(s.x * w, s.y * h, s.r, s.r);
       }
       ctx.globalAlpha = 1;
+      this.drawAurora(ctx, w, h, theme, time);
     }
 
-    // sun / moon
+    // sun / moon with layered glow
+    const sx = w * 0.78, sy = h * 0.18;
+    const core = theme.stars ? 26 : 46;
     ctx.fillStyle = theme.sun;
-    ctx.beginPath();
-    ctx.arc(w * 0.78, h * 0.18, theme.stars ? 26 : 46, 0, Math.PI * 2);
-    ctx.fill();
-    if (!theme.stars) {
-      ctx.globalAlpha = 0.25;
-      ctx.beginPath();
-      ctx.arc(w * 0.78, h * 0.18, 70, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.10;
+    ctx.beginPath(); ctx.arc(sx, sy, core * 3.1, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.18;
+    ctx.beginPath(); ctx.arc(sx, sy, core * 1.9, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(sx, sy, core, 0, Math.PI * 2); ctx.fill();
+    if (theme.stars) {
+      // moon craters
+      ctx.fillStyle = 'rgba(150,170,205,0.45)';
+      ctx.beginPath(); ctx.arc(sx - 8, sy - 4, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx + 6, sy + 7, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx + 9, sy - 8, 2.5, 0, Math.PI * 2); ctx.fill();
     }
+
+    // atmospheric haze toward the horizon
+    const hz = ctx.createLinearGradient(0, h * 0.3, 0, h * 0.75);
+    hz.addColorStop(0, 'rgba(255,255,255,0)');
+    hz.addColorStop(1, theme.haze);
+    ctx.fillStyle = hz;
+    ctx.fillRect(0, h * 0.3, w, h * 0.45);
+  }
+
+  drawAurora(ctx, w, h, theme, time) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    theme.aurora.forEach((color, bi) => {
+      ctx.beginPath();
+      for (let x = -20; x <= w + 20; x += 18) {
+        const y = h * (0.13 + bi * 0.065)
+          + Math.sin(x * 0.004 + time * (0.45 + bi * 0.16) + bi * 2.1) * 30
+          + Math.sin(x * 0.011 - time * 0.6 + bi) * 13;
+        if (x === -20) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = color;
+      const breathe = 0.17 + 0.06 * Math.sin(time * 0.8 + bi * 1.4);
+      ctx.lineWidth = 30 + bi * 10;
+      ctx.globalAlpha = breathe;
+      ctx.stroke();
+      ctx.lineWidth = (30 + bi * 10) * 2.3; // wide soft halo pass
+      ctx.globalAlpha = breathe * 0.5;
+      ctx.stroke();
+    });
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   drawRidges(ctx, w, h, theme, camX, time) {
-    const colors = [theme.ridgeFar, theme.ridgeNear];
-    const factors = [0.07, 0.16];
-    for (let r = 0; r < 2; r++) {
+    const colors = [theme.ridgeFar, theme.ridgeMid, theme.ridgeNear];
+    const factors = [0.05, 0.10, 0.17];
+    for (let r = 0; r < 3; r++) {
       const pts = this.ridges[r];
-      const segW = 190 - r * 40;
+      const segW = 210 - r * 45;
       const off = camX * factors[r];
       ctx.fillStyle = colors[r];
       ctx.beginPath();
@@ -105,12 +155,19 @@ export class Background {
         const u = 0.5 - Math.cos(t * Math.PI) * 0.5;
         const a = pts[((i % pts.length) + pts.length) % pts.length];
         const b = pts[(((i + 1) % pts.length) + pts.length) % pts.length];
-        const y = (a * (1 - u) + b * u) * h + h * (0.18 + r * 0.16);
+        const y = (a * (1 - u) + b * u) * h + h * (0.14 + r * 0.12);
         ctx.lineTo(sx, y);
       }
       ctx.lineTo(w, h);
       ctx.closePath();
       ctx.fill();
+      if (r < 2) {
+        // veil of haze between layers for depth
+        ctx.fillStyle = theme.haze;
+        ctx.globalAlpha = 0.35;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
 
     // clouds drift slowly in screen space
@@ -148,7 +205,7 @@ export class Background {
 
 // ------------------------------------------------------------------- terrain
 
-export function drawTerrain(ctx, terrain, theme, left, right, bottom) {
+export function drawTerrain(ctx, terrain, theme, left, right, bottom, time) {
   const step = 14;
   ctx.beginPath();
   ctx.moveTo(left, bottom);
@@ -165,6 +222,16 @@ export function drawTerrain(ctx, terrain, theme, left, right, bottom) {
   ctx.fillStyle = g;
   ctx.fill();
 
+  // soft shading just under the surface gives the snowpack depth
+  ctx.beginPath();
+  for (let x = left; x <= right + step; x += step) {
+    const y = terrain.groundY(x) + 9;
+    if (x === left) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = theme.snowShadow;
+  ctx.lineWidth = 7;
+  ctx.stroke();
+
   // crisp snow line on top
   ctx.beginPath();
   for (let x = left; x <= right + step; x += step) {
@@ -175,7 +242,36 @@ export function drawTerrain(ctx, terrain, theme, left, right, bottom) {
   ctx.lineWidth = 5;
   ctx.stroke();
 
+  drawSparkles(ctx, terrain, left, right, time);
   drawTrees(ctx, terrain, theme, left, right);
+}
+
+// glittering specks in the snowpack, twinkling on their own clocks
+function drawSparkles(ctx, terrain, left, right, time) {
+  const STEP = 85;
+  const i0 = Math.floor(left / STEP);
+  const i1 = Math.ceil(right / STEP);
+  ctx.fillStyle = '#ffffff';
+  for (let i = i0; i <= i1; i++) {
+    const h = hash2(terrain.seed ^ 0x55aa, i);
+    if (h > 0.62) continue;
+    const x = i * STEP + h * 80;
+    const depth = 10 + ((h * 1337) % 1) * 62;
+    const tw = Math.sin(time * (1.5 + h * 2.2) + h * 40);
+    if (tw < 0.3) continue;
+    const a = (tw - 0.3) / 0.7;
+    const y = terrain.groundY(x) + depth;
+    const s = 1.1 + h * 1.7;
+    ctx.globalAlpha = a * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(x, y - s * 2);
+    ctx.lineTo(x + s, y);
+    ctx.lineTo(x, y + s * 2);
+    ctx.lineTo(x - s, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawTrees(ctx, terrain, theme, left, right) {
@@ -193,6 +289,11 @@ function drawTrees(ctx, terrain, theme, left, right) {
 }
 
 function drawPine(ctx, x, y, size, theme) {
+  // grounding shadow
+  ctx.fillStyle = theme.snowShadow;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2, size * 0.5, size * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = '#6b4a35';
   ctx.fillRect(x - 2.5, y - size * 0.22, 5, size * 0.24);
   ctx.fillStyle = theme.tree;
@@ -228,6 +329,10 @@ export function drawEntity(ctx, it, time, theme) {
 
 function drawRock(ctx, it) {
   const { x, y, r } = it;
+  ctx.fillStyle = 'rgba(110,145,185,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + r * 0.5, r * 1.25, r * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = '#7e8b99';
   ctx.beginPath();
   ctx.moveTo(x - r, y + r * 0.5);
@@ -263,6 +368,25 @@ function drawCoin(ctx, it, time) {
   ctx.beginPath();
   ctx.ellipse(it.x, y, it.r * (0.35 + 0.65 * squash) * 0.62, it.r * 0.62, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // passing glint
+  const g = Math.sin(time * 1.7 + it.phase * 1.3);
+  if (g > 0.55) {
+    const a = (g - 0.55) / 0.45;
+    const gx = it.x - it.r * 0.35, gy = y - it.r * 0.45, s = 4.5;
+    ctx.save();
+    ctx.translate(gx, gy);
+    ctx.rotate(time * 1.2);
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-s, 0); ctx.lineTo(s, 0);
+    ctx.moveTo(0, -s); ctx.lineTo(0, s);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawAnimal(ctx, it, time) {
