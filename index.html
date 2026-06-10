@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Alpine Dash — a customizable ski safari</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;text y='.9em' font-size='90'&gt;⛷️&lt;/text&gt;&lt;/svg&gt;">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div class="hud-stat big" id="hud-dist">0 m</div>
+    <div class="hud-stat" id="hud-coins">● 0</div>
+    <div class="hud-stat" id="hud-score">score 0</div>
+  </div>
+  <div class="hud-right">
+    <div class="hud-stat" id="hud-mount"></div>
+    <button class="icon-btn" id="btn-pause" title="Pause (Esc)">⏸</button>
+  </div>
+</div>
+
+<!-- Main menu -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1 class="title">ALPINE&nbsp;DASH</h1>
+    <p class="subtitle">outrun the avalanche</p>
+    <div class="best" id="menu-best"></div>
+    <button class="btn primary" id="btn-play">▶ &nbsp;Play</button>
+    <button class="btn" id="btn-customize">⚙ &nbsp;Customize</button>
+    <p class="help">
+      <b>Hold</b> (space / click / touch) to jump.<br>
+      <b>Keep holding</b> in the air to backflip — land flips for speed boosts.<br>
+      Dodge rocks, grab coins, and ride animals. Don't get caught!
+    </p>
+  </div>
+</div>
+
+<!-- Customize panel -->
+<div id="customize" class="overlay hidden">
+  <div class="panel wide">
+    <h2>Customize</h2>
+    <div class="settings-grid">
+
+      <fieldset>
+        <legend>Skier</legend>
+        <label class="row">Suit <input type="color" data-key="suitColor"></label>
+        <label class="row">Scarf <input type="color" data-key="scarfColor"></label>
+        <label class="row">Skis <input type="color" data-key="skiColor"></label>
+        <label class="row">Theme
+          <select data-key="theme">
+            <option value="day">Day</option>
+            <option value="sunset">Sunset</option>
+            <option value="night">Night</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Mountain</legend>
+        <label class="row slider">Steepness
+          <input type="range" data-key="steepness" min="0.6" max="1.6" step="0.05"><output></output></label>
+        <label class="row slider">Hilliness
+          <input type="range" data-key="hilliness" min="0.3" max="2" step="0.05"><output></output></label>
+        <label class="row slider">Rocks
+          <input type="range" data-key="rocks" min="0" max="2" step="0.1"><output></output></label>
+        <label class="row slider">Coins
+          <input type="range" data-key="coins" min="0" max="2" step="0.1"><output></output></label>
+        <label class="row slider">Animals
+          <input type="range" data-key="animals" min="0" max="2" step="0.1"><output></output></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Physics</legend>
+        <label class="row slider">Speed
+          <input type="range" data-key="speed" min="0.7" max="1.5" step="0.05"><output></output></label>
+        <label class="row slider">Gravity
+          <input type="range" data-key="gravity" min="0.7" max="1.5" step="0.05"><output></output></label>
+        <label class="row slider">Avalanche
+          <input type="range" data-key="avalanche" min="0.4" max="2" step="0.05"><output></output></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Effects</legend>
+        <label class="row check"><input type="checkbox" data-key="snowfall"> Snowfall</label>
+        <label class="row check"><input type="checkbox" data-key="sound"> Sound</label>
+        <label class="row check"><input type="checkbox" data-key="screenShake"> Screen shake</label>
+      </fieldset>
+
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btn-reset-settings">Reset defaults</button>
+      <button class="btn primary" id="btn-customize-done">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pause -->
+<div id="paused" class="overlay hidden">
+  <div class="panel">
+    <h2>Paused</h2>
+    <button class="btn primary" id="btn-resume">Resume</button>
+    <button class="btn" id="btn-quit">Quit to menu</button>
+  </div>
+</div>
+
+<!-- Game over -->
+<div id="gameover" class="overlay hidden">
+  <div class="panel">
+    <h2 id="go-title">Wiped out!</h2>
+    <div class="stats">
+      <div><span id="go-dist">0 m</span><label>distance</label></div>
+      <div><span id="go-coins">0</span><label>coins</label></div>
+      <div><span id="go-tricks">0</span><label>trick pts</label></div>
+      <div><span id="go-score">0</span><label>score</label></div>
+    </div>
+    <div class="best" id="go-best"></div>
+    <button class="btn primary" id="btn-retry">↻ &nbsp;Ride again</button>
+    <button class="btn" id="btn-menu">Menu</button>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
