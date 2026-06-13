@@ -38,6 +38,7 @@ class Game {
     this.perfCheck = 0;
 
     this.bindInput();
+    this.bindFullscreen();
     this.resize();
     window.addEventListener('resize', () => this.resize());
     // iOS Safari resizes the visual viewport (not the window) when the
@@ -84,6 +85,7 @@ class Game {
     this.held = false;
     this.ui.showGame();
     this.sound.ensure();
+    this.tryAutoFullscreen();
   }
 
   toMenu() {
@@ -175,6 +177,45 @@ class Game {
     this.h = window.innerHeight;
     this.canvas.width = Math.round(this.w * dpr);
     this.canvas.height = Math.round(this.h * dpr);
+  }
+
+  bindFullscreen() {
+    const btn = document.getElementById('btn-fullscreen');
+    if (!btn) return;
+
+    const update = () => {
+      const inFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      btn.textContent = inFS ? '✕' : '⛶';
+      btn.title = inFS ? 'Exit fullscreen' : 'Fullscreen';
+    };
+
+    btn.addEventListener('click', () => {
+      const inFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (inFS) {
+        (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+      } else {
+        const el = document.documentElement;
+        (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el, { navigationUI: 'hide' });
+      }
+    });
+
+    document.addEventListener('fullscreenchange', update);
+    document.addEventListener('webkitfullscreenchange', update);
+
+    // hide button if the API isn't available (some iOS in-app browsers)
+    const el = document.documentElement;
+    if (el && !el.requestFullscreen && !el.webkitRequestFullscreen) {
+      btn.style.display = 'none';
+    }
+  }
+
+  // auto-enter fullscreen on first play (mobile UX convenience)
+  tryAutoFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    const el = document.documentElement;
+    if (!el) return;
+    (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el, { navigationUI: 'hide' })
+      ?.catch(() => {}); // silently ignore if blocked
   }
 
   buzz(pattern) {

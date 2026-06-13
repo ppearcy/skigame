@@ -73,6 +73,11 @@ html, body {
 }
 .icon-btn:hover { background: rgba(10, 30, 60, .6); }
 
+/* hide fullscreen button on devices that natively go fullscreen (e.g. added to home screen) */
+@media (display-mode: fullscreen), (display-mode: standalone) {
+  #btn-fullscreen { display: none !important; }
+}
+
 /* ---------- Overlays ---------- */
 .overlay {
   position: fixed;
