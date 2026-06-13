@@ -23,6 +23,7 @@ export const DEFAULTS = {
   snowfall: true,
   sound: true,
   screenShake: true,
+  haptics: true,         // vibration feedback on supported (mobile) devices
 };
 
 const SETTINGS_KEY = 'alpinedash.settings.v1';

@@ -178,8 +178,9 @@ export class Player {
     this.angle = theta;
     this.state = 'ground';
     this.trickRot = 0;
+    const air = this.airTime;
     this.airTime = 0;
-    this.events.push({ type: 'land' });
+    this.events.push({ type: 'land', air });
   }
 
   updateCrash(dt, terrain) {

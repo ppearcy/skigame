@@ -1,12 +1,19 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
 
 html, body {
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none; /* no pull-to-refresh / scroll chaining on mobile */
   background: #0b1530;
   font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: none;
 }
 
 #game {
@@ -28,7 +35,11 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 14px 18px;
+  /* keep clear of notches / rounded corners */
+  padding: calc(14px + env(safe-area-inset-top, 0px))
+           calc(18px + env(safe-area-inset-right, 0px))
+           14px
+           calc(18px + env(safe-area-inset-left, 0px));
   pointer-events: none;
   z-index: 5;
 }
@@ -58,6 +69,7 @@ html, body {
   border-radius: 10px;
   font-size: 18px;
   cursor: pointer;
+  touch-action: manipulation;
 }
 .icon-btn:hover { background: rgba(10, 30, 60, .6); }
 
@@ -72,7 +84,10 @@ html, body {
   backdrop-filter: blur(4px);
   z-index: 10;
   overflow-y: auto;
-  padding: 20px;
+  padding: calc(20px + env(safe-area-inset-top, 0px))
+           calc(20px + env(safe-area-inset-right, 0px))
+           calc(20px + env(safe-area-inset-bottom, 0px))
+           calc(20px + env(safe-area-inset-left, 0px));
   animation: overlay-in .28s ease both;
 }
 @keyframes overlay-in {
@@ -139,6 +154,7 @@ html, body {
   border: 2px solid rgba(140, 200, 255, .45);
   border-radius: 12px;
   cursor: pointer;
+  touch-action: manipulation; /* no double-tap zoom delay */
   transition: transform .08s, background .15s;
 }
 .btn:hover { background: rgba(255, 255, 255, .16); transform: translateY(-1px); }
@@ -222,4 +238,23 @@ select {
   .panel { padding: 24px 20px; }
   .title { font-size: 38px; }
   .stats span { font-size: 19px; }
+}
+
+/* bigger touch targets on touch-first devices */
+@media (pointer: coarse) {
+  .icon-btn { width: 52px; height: 52px; font-size: 22px; }
+  .btn { padding: 16px 18px; }
+  .row { min-height: 36px; }
+  .row.check input { width: 22px; height: 22px; }
+  input[type="range"] { height: 32px; }
+}
+
+/* landscape phones: keep panels compact so buttons stay reachable */
+@media (max-height: 480px) {
+  .overlay { align-items: flex-start; }
+  .panel { padding: 18px 24px; }
+  .title { font-size: 30px; }
+  .subtitle { margin-bottom: 10px; }
+  .help { margin-top: 10px; font-size: 12px; }
+  .btn { margin: 7px 0; padding: 10px 16px; }
 }

@@ -1,6 +1,12 @@
 import { mulberry32, hash2, clamp } from './config.js';
 import { MOUNTS } from './player.js';
 
+// '#rrggbb' -> 'rgba(r,g,b,a)' for gradient stops
+function withAlpha(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
 export const THEMES = {
   day: {
     skyTop: '#3f9ce4', skyMid: '#8ecdf4', skyBot: '#eef9ff',
@@ -55,6 +61,10 @@ export class Background {
     this.flakes = Array.from({ length: 130 }, () => ({
       x: rng(), y: rng(), s: 1 + rng() * 2.2, w: rng() * Math.PI * 2,
     }));
+    this.birds = Array.from({ length: 4 }, () => ({
+      x: rng(), y: 0.1 + rng() * 0.22, s: 0.7 + rng() * 0.6,
+      drift: 14 + rng() * 12, flap: rng() * Math.PI * 2,
+    }));
   }
 
   makeRidge(rng, base) {
@@ -84,17 +94,20 @@ export class Background {
       }
       ctx.globalAlpha = 1;
       this.drawAurora(ctx, w, h, theme, time);
+      this.drawShootingStar(ctx, w, h, time);
     }
 
-    // sun / moon with layered glow
+    // sun / moon with a smooth radial halo
     const sx = w * 0.78, sy = h * 0.18;
     const core = theme.stars ? 26 : 46;
+    const breathe = 1 + 0.04 * Math.sin(time * 0.6);
+    const halo = ctx.createRadialGradient(sx, sy, core * 0.5, sx, sy, core * 3.8 * breathe);
+    halo.addColorStop(0, withAlpha(theme.sun, 0.55));
+    halo.addColorStop(0.35, withAlpha(theme.sun, 0.18));
+    halo.addColorStop(1, withAlpha(theme.sun, 0));
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(sx, sy, core * 3.8 * breathe, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = theme.sun;
-    ctx.globalAlpha = 0.10;
-    ctx.beginPath(); ctx.arc(sx, sy, core * 3.1, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.18;
-    ctx.beginPath(); ctx.arc(sx, sy, core * 1.9, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(sx, sy, core, 0, Math.PI * 2); ctx.fill();
     if (theme.stars) {
       // moon craters
@@ -110,6 +123,26 @@ export class Background {
     hz.addColorStop(1, theme.haze);
     ctx.fillStyle = hz;
     ctx.fillRect(0, h * 0.3, w, h * 0.45);
+  }
+
+  // occasional meteor streaking across the night sky
+  drawShootingStar(ctx, w, h, time) {
+    const period = 8.5;
+    const cycle = Math.floor(time / period);
+    const t = (time % period) / 0.8; // first 0.8s of each cycle
+    if (t > 1) return;
+    const h1 = hash2(0x5747, cycle), h2 = hash2(0x5748, cycle);
+    if (h1 > 0.8) return; // some cycles stay quiet
+    const x0 = (0.1 + h1 * 0.7) * w, y0 = (0.04 + h2 * 0.2) * h;
+    const x = x0 + t * 300, y = y0 + t * 130;
+    const fade = Math.sin(t * Math.PI);
+    ctx.strokeStyle = `rgba(235,243,255,${0.85 * fade})`;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x - 70 * fade, y - 30 * fade);
+    ctx.lineTo(x, y);
+    ctx.stroke();
   }
 
   drawAurora(ctx, w, h, theme, time) {
@@ -167,6 +200,22 @@ export class Background {
         ctx.globalAlpha = 0.35;
         ctx.fill();
         ctx.globalAlpha = 1;
+      }
+    }
+
+    // distant birds gliding between the ridges (daytime themes only)
+    if (!theme.stars) {
+      ctx.strokeStyle = 'rgba(35,55,85,0.55)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      for (const b of this.birds) {
+        const bx = ((b.x * w + time * b.drift - camX * 0.045) % (w + 120) + (w + 120)) % (w + 120) - 60;
+        const by = b.y * h + Math.sin(time * 0.7 + b.flap) * 9;
+        const wing = (0.5 + 0.5 * Math.sin(time * 6 + b.flap)) * 5 * b.s;
+        ctx.beginPath();
+        ctx.moveTo(bx - 7 * b.s, by - wing);
+        ctx.quadraticCurveTo(bx, by + 2 * b.s, bx + 7 * b.s, by - wing);
+        ctx.stroke();
       }
     }
 
@@ -241,6 +290,23 @@ export function drawTerrain(ctx, terrain, theme, left, right, bottom, time) {
   ctx.strokeStyle = theme.snowLine;
   ctx.lineWidth = 5;
   ctx.stroke();
+
+  // sun-facing sheen: uphill faces (sun sits up-right) catch a bright edge
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#ffffff';
+  for (let x = left; x <= right; x += step) {
+    const y0 = terrain.groundY(x);
+    const y1 = terrain.groundY(x + step);
+    const a = clamp(-((y1 - y0) / step) * 1.1 + 0.12, 0, 0.55);
+    if (a < 0.05) continue;
+    ctx.globalAlpha = a;
+    ctx.beginPath();
+    ctx.moveTo(x, y0 - 1.5);
+    ctx.lineTo(x + step, y1 - 1.5);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 
   drawSparkles(ctx, terrain, left, right, time);
   drawTrees(ctx, terrain, theme, left, right);
@@ -360,6 +426,17 @@ function drawRock(ctx, it) {
 function drawCoin(ctx, it, time) {
   const y = it.y + (it.bob || 0);
   const squash = Math.abs(Math.sin(time * 3 + it.phase)); // fake spin
+
+  // warm glow so coins read from a distance
+  const pulse = 0.2 + 0.08 * Math.sin(time * 3 + it.phase);
+  const glow = ctx.createRadialGradient(it.x, y, it.r * 0.3, it.x, y, it.r * 2.4);
+  glow.addColorStop(0, `rgba(255,214,90,${pulse})`);
+  glow.addColorStop(1, 'rgba(255,214,90,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(it.x, y, it.r * 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.fillStyle = '#f5b81d';
   ctx.beginPath();
   ctx.ellipse(it.x, y, it.r * (0.35 + 0.65 * squash), it.r, 0, 0, Math.PI * 2);
@@ -505,6 +582,20 @@ export function drawSnowmobile(ctx, time, idle) {
 }
 
 // -------------------------------------------------------------------- player
+
+// soft contact shadow on the snow below the skier; shrinks and fades with
+// height so airs read clearly against the white slope
+export function drawPlayerShadow(ctx, p, terrain, theme) {
+  const gy = terrain.groundY(p.x);
+  const height = clamp(gy - p.y, 0, 480);
+  const sc = 1 - height / 560;
+  ctx.fillStyle = theme.snowShadow;
+  ctx.globalAlpha = 0.35 + 0.45 * sc;
+  ctx.beginPath();
+  ctx.ellipse(p.x, gy + 3, 12 + 24 * sc, 2.5 + 4.5 * sc, Math.atan(terrain.slopeAt(p.x)), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
 
 export function drawPlayer(ctx, p, settings, time) {
   ctx.save();
@@ -669,9 +760,13 @@ export function drawAvalanche(ctx, av, terrain, theme, camLeft, time) {
   const front = av.front;
   if (front < camLeft - 100) return;
 
-  ctx.fillStyle = theme.avalanche;
-
-  // solid mass behind the rolling front
+  // solid mass behind the rolling front, shaded darker toward its base
+  const gyF = terrain.groundY(front);
+  const body = ctx.createLinearGradient(0, gyF - 420, 0, gyF + 60);
+  body.addColorStop(0, theme.avalanche);
+  body.addColorStop(0.75, theme.avalanche);
+  body.addColorStop(1, theme.avalancheShade);
+  ctx.fillStyle = body;
   ctx.beginPath();
   ctx.moveTo(camLeft - 200, terrain.groundY(camLeft - 200) - 900);
   for (let x = camLeft - 200; x <= front; x += 40) {
@@ -698,6 +793,22 @@ export function drawAvalanche(ctx, av, terrain, theme, camLeft, time) {
     ctx.beginPath();
     ctx.arc(x - 14, gy - 75 - k * 7 + wob * 10, r * 0.62, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // dark chunks of packed snow tumbling inside the front
+  ctx.fillStyle = theme.avalancheShade;
+  for (let k = 0; k < 7; k++) {
+    const ph = time * 4.5 + k * 1.31;
+    const x = front - 24 - (k * 67) % 300;
+    if (x < camLeft - 150) continue;
+    const gy = terrain.groundY(x);
+    const yy = gy - 36 - Math.abs(Math.sin(ph)) * 75 - k * 4;
+    const s = 5 + (k % 3) * 3;
+    ctx.save();
+    ctx.translate(x, yy);
+    ctx.rotate(ph * 1.6);
+    ctx.fillRect(-s, -s, s * 2, s * 2);
+    ctx.restore();
   }
 
   // spray flung ahead of the front

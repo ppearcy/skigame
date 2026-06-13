@@ -3,7 +3,7 @@ import { Terrain } from './terrain.js';
 import { Player, MOUNTS } from './player.js';
 import { Entities } from './entities.js';
 import { Avalanche } from './avalanche.js';
-import { Background, THEMES, drawTerrain, drawEntity, drawPlayer, drawAvalanche, drawDebris } from './render.js';
+import { Background, THEMES, drawTerrain, drawEntity, drawPlayer, drawPlayerShadow, drawAvalanche, drawDebris } from './render.js';
 import { Sound } from './audio.js';
 import { UI } from './ui.js';
 
@@ -31,9 +31,20 @@ class Game {
     this.cam = { x: 0, y: 0, zoom: 1 };
     this.last = performance.now();
 
+    // adaptive resolution: starts at the device cap, steps down if the
+    // frame time stays high so weaker phones keep a smooth frame rate
+    this.dprCap = 2;
+    this.frameAvg = 16;
+    this.perfCheck = 0;
+
     this.bindInput();
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    // iOS Safari resizes the visual viewport (not the window) when the
+    // address bar collapses; orientation changes can report stale sizes
+    // unless we re-measure a beat later
+    window.visualViewport?.addEventListener('resize', () => this.resize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 120));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'playing') this.setPaused(true);
     });
@@ -58,6 +69,7 @@ class Game {
     this.floaters = [];
     this.debris = [];
     this.trail = [];
+    this.poses = []; // recent player poses, for the high-speed ghost trail
     this.time = 0;
     this.shake = 0;
     this.dieTimer = 0;
@@ -106,6 +118,7 @@ class Game {
     this.held = false;
     this.shake = 22;
     this.sound.gameOver();
+    this.buzz([60, 50, 90]);
     this.burst(this.player.x, this.player.y - 15, 26, '#ffffff', 380);
   }
 
@@ -130,6 +143,7 @@ class Game {
       e.preventDefault();
       this.press();
     });
+    this.canvas.addEventListener('contextmenu', e => e.preventDefault()); // long-press menu on mobile
     window.addEventListener('pointerup', () => { this.held = false; });
     window.addEventListener('pointercancel', () => { this.held = false; });
 
@@ -155,19 +169,36 @@ class Game {
   }
 
   resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.dprCap);
     this.dpr = dpr;
     this.w = window.innerWidth;
     this.h = window.innerHeight;
-    this.canvas.width = this.w * dpr;
-    this.canvas.height = this.h * dpr;
+    this.canvas.width = Math.round(this.w * dpr);
+    this.canvas.height = Math.round(this.h * dpr);
+  }
+
+  buzz(pattern) {
+    if (!this.settings.haptics) return;
+    try { globalThis.navigator?.vibrate?.(pattern); } catch { /* unsupported */ }
   }
 
   // ------------------------------------------------------------------ update
 
   loop(now) {
-    const dt = clamp((now - this.last) / 1000, 0, 1 / 30);
+    const rawMs = now - this.last;
+    const dt = clamp(rawMs / 1000, 0, 1 / 30);
     this.last = now;
+
+    // sustained slow frames -> drop render resolution one notch
+    this.frameAvg += (clamp(rawMs, 0, 100) - this.frameAvg) * 0.04;
+    if (++this.perfCheck >= 150) {
+      this.perfCheck = 0;
+      if (this.frameAvg > 26 && this.dprCap > 1) {
+        this.dprCap = Math.max(1, this.dprCap - 0.5);
+        this.frameAvg = 16;
+        this.resize();
+      }
+    }
 
     if (this.state === 'playing' || this.state === 'menu' || this.state === 'dying') {
       this.update(dt);
@@ -190,6 +221,9 @@ class Game {
 
     p.update(dt, this.held && !this.demo, this.terrain);
     this.handleEvents();
+
+    this.poses.push({ x: p.x, y: p.y, angle: p.angle, state: p.state, mount: p.mount, grace: 0 });
+    if (this.poses.length > 10) this.poses.shift();
 
     const camLeft = this.cam.x;
     const camRight = this.cam.x + this.w / this.cam.zoom;
@@ -245,6 +279,14 @@ class Game {
       switch (ev.type) {
         case 'jump':
           this.sound.jump();
+          this.buzz(8);
+          break;
+        case 'land':
+          // big airs kick up a puff of powder on touchdown
+          if (ev.air > 0.3) {
+            this.burst(p.x, p.y, Math.min(6 + ev.air * 10, 18), '#ffffff', 200);
+            if (ev.air > 0.6) this.shake = Math.max(this.shake, 4);
+          }
           break;
         case 'flip': {
           const pts = 100 * ev.n * (1 + 0.25 * (ev.combo - 1));
@@ -253,11 +295,13 @@ class Game {
           this.float(p.x, p.y - 70, `${label} +${Math.floor(pts)}`, '#ffd75e', 20);
           if (ev.combo > 1) this.float(p.x, p.y - 96, `combo ×${ev.combo}`, '#9fd8ff', 14);
           this.sound.flip(ev.n);
+          this.buzz(15);
           this.burst(p.x, p.y - 20, 14, '#ffd75e', 230);
           break;
         }
         case 'crash':
           this.sound.crash();
+          this.buzz([30, 40, 30]);
           this.shake = Math.max(this.shake, 13);
           this.burst(p.x, p.y - 10, 24, '#ffffff', 360);
           // skis rip off and tumble away
@@ -279,6 +323,7 @@ class Game {
           break;
         case 'mount':
           this.sound.mount();
+          this.buzz(12);
           this.float(p.x, p.y - 70, MOUNTS[ev.kind].label + '!', '#9fff9f', 18);
           break;
         case 'dismount':
@@ -451,7 +496,23 @@ class Game {
     for (const d of this.debris) drawDebris(ctx, d);
 
     if (this.player.state !== 'dead' || !this.deathCaught) {
-      drawPlayer(ctx, this.player, this.settings, this.time);
+      const p = this.player;
+      drawPlayerShadow(ctx, p, this.terrain, theme);
+
+      // translucent afterimages once you're really flying
+      const ghost = clamp((p.speed - 850) / 700, 0, 1);
+      if (ghost > 0 && (p.state === 'ground' || p.state === 'air')) {
+        const taps = [[8, 0.20], [5, 0.12], [2, 0.06]];
+        for (const [back, alpha] of taps) {
+          const pose = this.poses[this.poses.length - 1 - back];
+          if (!pose) continue;
+          ctx.globalAlpha = alpha * ghost;
+          drawPlayer(ctx, pose, this.settings, this.time);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      drawPlayer(ctx, p, this.settings, this.time);
     }
 
     if (!this.demo) {

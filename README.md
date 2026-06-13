@@ -42,9 +42,16 @@ The **Customize** menu (saved to `localStorage`) lets you tune:
 - **Skier** — suit / scarf / ski colors, plus Day / Sunset / Night themes
 - **Mountain** — steepness, hilliness, and the density of rocks, coins, and animals (set any to 0 to disable)
 - **Physics** — top speed, gravity, and avalanche aggression
-- **Effects** — snowfall, sound, screen shake
+- **Effects** — snowfall, sound, screen shake, vibration (mobile)
 
 Physics and density sliders apply live; steepness/hilliness shape the next run.
+
+## Mobile
+
+The game is touch-first friendly: safe-area (notch) aware HUD, large touch
+targets, no pull-to-refresh or double-tap zoom, haptic feedback on jumps,
+flips, and crashes, and adaptive render resolution that steps down
+automatically if the device can't hold a smooth frame rate.
 
 ## Code tour
 
