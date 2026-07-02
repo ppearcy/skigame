@@ -13,6 +13,8 @@ export const DEFAULTS = {
   rocks: 1.0,            // obstacle density (0 disables)
   coins: 1.0,            // coin density (0 disables)
   animals: 1.0,          // rideable animal frequency (0 disables)
+  ramps: 1.0,            // jump-kicker frequency (0 disables)
+  powerups: 1.0,         // power-up orb frequency (0 disables)
 
   // physics / difficulty
   speed: 1.0,            // terminal speed multiplier

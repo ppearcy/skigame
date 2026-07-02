@@ -346,12 +346,47 @@ function drawTrees(ctx, terrain, theme, left, right) {
   const i1 = Math.ceil(right / seg) + 1;
   for (let i = i0; i <= i1; i++) {
     const h = hash2(terrain.seed, i);
-    if (h > 0.34) continue;
     const x = i * seg + (h * 977 % 1) * seg;
-    const size = 26 + h * 80;
     const y = terrain.groundY(x) + 2;
-    drawPine(ctx, x, y, size, theme);
+    if (h <= 0.34) {
+      drawPine(ctx, x, y, 26 + h * 80, theme);
+    } else if (h <= 0.385) {
+      drawSnowman(ctx, x, y, 16 + (h * 613 % 1) * 8, theme);
+    }
   }
+}
+
+// friendly roadside snowman waving the skier past
+function drawSnowman(ctx, x, y, size, theme) {
+  ctx.fillStyle = theme.snowShadow;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2, size * 0.9, size * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // body + head
+  ctx.fillStyle = theme.snowLine;
+  ctx.beginPath(); ctx.arc(x, y - size * 0.6, size * 0.62, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - size * 1.45, size * 0.42, 0, Math.PI * 2); ctx.fill();
+  // stick arm raised in a wave
+  ctx.strokeStyle = '#6b4a35';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - size * 0.5, y - size * 0.75);
+  ctx.lineTo(x - size * 1.05, y - size * 1.35);
+  ctx.stroke();
+  // coal eyes + carrot
+  ctx.fillStyle = '#243447';
+  ctx.beginPath();
+  ctx.arc(x - size * 0.14, y - size * 1.52, 1.6, 0, Math.PI * 2);
+  ctx.arc(x + size * 0.14, y - size * 1.52, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#f59e2d';
+  ctx.beginPath();
+  ctx.moveTo(x, y - size * 1.42);
+  ctx.lineTo(x + size * 0.42, y - size * 1.36);
+  ctx.lineTo(x, y - size * 1.32);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function drawPine(ctx, x, y, size, theme) {
@@ -390,7 +425,104 @@ export function drawEntity(ctx, it, time, theme) {
     case 'rock': drawRock(ctx, it); break;
     case 'coin': drawCoin(ctx, it, time); break;
     case 'animal': drawAnimal(ctx, it, time); break;
+    case 'ramp': drawRamp(ctx, it, theme); break;
+    case 'powerup': drawPowerup(ctx, it, time); break;
   }
+}
+
+const POWERUP_STYLE = {
+  magnet: { color: '#6fc3ff', icon: '🧲' },
+  shield: { color: '#7ee8f2', icon: '🛡' },
+  rocket: { color: '#ffb03a', icon: '🚀' },
+};
+
+function drawPowerup(ctx, it, time) {
+  const y = it.y + (it.bob || 0);
+  const { color, icon } = POWERUP_STYLE[it.kind];
+
+  // pulsing beacon glow so pickups read from across the screen
+  const pulse = 0.3 + 0.12 * Math.sin(time * 4 + it.phase);
+  const glow = ctx.createRadialGradient(it.x, y, it.r * 0.3, it.x, y, it.r * 2.6);
+  glow.addColorStop(0, withAlpha(color, pulse));
+  glow.addColorStop(1, withAlpha(color, 0));
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(it.x, y, it.r * 2.6, 0, Math.PI * 2); ctx.fill();
+
+  // orb
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath(); ctx.arc(it.x, y, it.r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(it.x, y, it.r, 0, Math.PI * 2);
+  ctx.stroke();
+  // slowly orbiting sparkle on the rim
+  const sa = time * 1.8 + it.phase;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(it.x + Math.cos(sa) * it.r, y + Math.sin(sa) * it.r, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.font = `${Math.round(it.r * 1.2)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(icon, it.x, y + 1);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawRamp(ctx, it, theme) {
+  const { x, w, h, y, yBack } = it;
+  const lipY = y - h;
+
+  // grounding shadow under the lip
+  ctx.fillStyle = theme.snowShadow;
+  ctx.beginPath();
+  ctx.ellipse(x - w * 0.25, y + 3, w * 0.5, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // packed-snow wedge
+  const g = ctx.createLinearGradient(x - w, yBack, x, lipY);
+  g.addColorStop(0, theme.snow);
+  g.addColorStop(1, theme.snowLine);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x - w, yBack);
+  ctx.quadraticCurveTo(x - w * 0.3, y - h * 0.15, x, lipY);
+  ctx.lineTo(x, y + 4);
+  ctx.lineTo(x - w, yBack + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // wooden facing on the takeoff surface
+  ctx.strokeStyle = '#b07a4a';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - w, yBack);
+  ctx.quadraticCurveTo(x - w * 0.3, y - h * 0.15, x, lipY);
+  ctx.stroke();
+  // support strut under the lip
+  ctx.strokeStyle = '#8a5c36';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x - 4, lipY + 3);
+  ctx.lineTo(x - 10, y);
+  ctx.stroke();
+
+  // red pennant marking the takeoff
+  ctx.strokeStyle = '#7d8794';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, lipY);
+  ctx.lineTo(x, lipY - 26);
+  ctx.stroke();
+  ctx.fillStyle = '#e8433a';
+  ctx.beginPath();
+  ctx.moveTo(x, lipY - 26);
+  ctx.lineTo(x + 16, lipY - 21);
+  ctx.lineTo(x, lipY - 16);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function drawRock(ctx, it) {

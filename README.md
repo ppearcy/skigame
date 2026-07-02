@@ -28,11 +28,19 @@ or `npx serve`, or just deploy the folder to GitHub Pages / Netlify.
 
 - Land sideways and you **crash** — the avalanche closes in fast while you tumble.
 - **Rocks** crash you. **Coins** are worth 25 points each.
+- Hit **ramps** for a huge launch — the faster you're going, the bigger the air.
+- Land flush with the slope after real airtime for a **PERFECT!** bonus.
+- Barely dodging a rock pays a **near-miss** bonus.
+- Grab **power-up orbs**:
+  - 🧲 **Magnet** — nearby coins swarm to you for 7 s
+  - 🛡 **Shield** — absorbs one rock hit (kept until used)
+  - 🚀 **Rocket** — big speed boost that smashes straight through rocks
 - **Ride animals** by skiing into them:
   - 🐧 **Penguin** — faster, higher jumps
   - 🦍 **Yeti** — smashes straight through rocks (+50 each)
   - 🛷 **Snowmobile** — fastest, but wrecks on the first rock it hits
-- Consecutive flip landings build a **combo multiplier**.
+- Consecutive flip landings build a **combo multiplier** (shown live in the HUD).
+- Every 500 m earns a milestone fanfare.
 - Score = distance (m) + coins×25 + trick points. Best score is saved locally.
 
 ## Customize
@@ -40,7 +48,7 @@ or `npx serve`, or just deploy the folder to GitHub Pages / Netlify.
 The **Customize** menu (saved to `localStorage`) lets you tune:
 
 - **Skier** — suit / scarf / ski colors, plus Day / Sunset / Night themes
-- **Mountain** — steepness, hilliness, and the density of rocks, coins, and animals (set any to 0 to disable)
+- **Mountain** — steepness, hilliness, and the density of rocks, coins, animals, ramps, and power-ups (set any to 0 to disable)
 - **Physics** — top speed, gravity, and avalanche aggression
 - **Effects** — snowfall, sound, screen shake, vibration (mobile)
 
@@ -60,7 +68,7 @@ automatically if the device can't hold a smooth frame rate.
 | `js/main.js` | Game loop, input, camera, collisions, particles, scoring |
 | `js/terrain.js` | Infinite slope: downhill grade + two octaves of smoothed noise |
 | `js/player.js` | Skier physics: slope sliding, jumps, flip rotation, crashes |
-| `js/entities.js` | Spawning of rocks, coin lines/arcs, and rideable animals |
+| `js/entities.js` | Spawning of rocks, coins, animals, ramps, and power-ups |
 | `js/avalanche.js` | Rubber-banded chase logic keyed off smoothed player speed |
 | `js/render.js` | Themes, parallax background, terrain, characters, avalanche |
 | `js/audio.js` | Procedural WebAudio sound effects (no asset files) |

@@ -31,6 +31,8 @@ export class Player {
     this.crashTimer = 0;
     this.grace = 0;          // post-crash invulnerability to rocks
     this.combo = 0;
+    this.boostTimer = 0;     // rocket power-up: extra thrust while > 0
+    this.shield = false;     // shield power-up: absorbs one rock hit
     this.events = [];        // consumed by game each frame
   }
 
@@ -40,7 +42,10 @@ export class Player {
   get cx() { return this.x + Math.sin(this.angle) * 16; }
   get cy() { return this.y - Math.cos(this.angle) * 16; }
 
-  thrust() { return this.mount ? MOUNTS[this.mount].thrust : 0; }
+  thrust() {
+    return (this.mount ? MOUNTS[this.mount].thrust : 0)
+      + (this.boostTimer > 0 ? 820 : 0);
+  }
   jumpMult() { return this.mount ? MOUNTS[this.mount].jump : 1; }
   // drag scales so the "speed" setting moves terminal velocity
   dragK() { return 0.00046 / (this.s.speed * this.s.speed); }
@@ -55,6 +60,18 @@ export class Player {
       this.sinceGround = 1; // consume coyote window
       this.events.push({ type: 'jump' });
     }
+  }
+
+  // hitting a kicker's lip: pop off it, scaled with approach speed so fast
+  // runs earn monster airs (and more flip time)
+  launchRamp() {
+    const pop = clamp(this.speed * 0.55, 420, 980) * this.jumpMult();
+    this.vy = Math.min(this.vy, 0) - pop;
+    this.state = 'air';
+    this.airTime = 0;
+    this.trickRot = 0;
+    this.sinceGround = 1;
+    this.events.push({ type: 'ramp' });
   }
 
   setMount(kind) {
@@ -75,6 +92,7 @@ export class Player {
     this.crashTimer = 0.95;
     this.combo = 0;
     this.trickRot = 0;
+    this.boostTimer = 0;
     this.vx *= 0.3;
     this.vy = -200;                       // thrown into the air by the impact
     this.angVel = 9 + Math.random() * 5;  // violent forward tumble
@@ -84,6 +102,7 @@ export class Player {
 
   update(dt, held, terrain) {
     this.grace = Math.max(0, this.grace - dt);
+    this.boostTimer = Math.max(0, this.boostTimer - dt);
     switch (this.state) {
       case 'ground': this.updateGround(dt, terrain); break;
       case 'air':    this.updateAir(dt, held, terrain); break;
@@ -145,6 +164,7 @@ export class Player {
 
     this.vy += this.grav * dt;
     this.vx -= this.dragK() * 0.4 * this.vx * this.vx * dt;
+    if (this.boostTimer > 0) this.vx += 420 * dt; // rocket keeps pushing mid-air
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
@@ -166,6 +186,10 @@ export class Player {
     // project velocity onto the slope: slamming into a face costs speed
     let spd = Math.max(this.vx * Math.cos(theta) + this.vy * Math.sin(theta), MIN_SPEED);
 
+    // nailing the slope angle after real airtime = perfect landing bonus
+    const perfect = this.airTime > 0.45 && Math.abs(diff) < 0.22;
+    if (perfect) spd += 90;
+
     const flips = Math.floor(this.trickRot / FLIP_ROT);
     if (flips > 0) {
       this.combo++;
@@ -180,7 +204,7 @@ export class Player {
     this.trickRot = 0;
     const air = this.airTime;
     this.airTime = 0;
-    this.events.push({ type: 'land', air });
+    this.events.push({ type: 'land', air, perfect });
   }
 
   updateCrash(dt, terrain) {

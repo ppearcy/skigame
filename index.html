@@ -21,8 +21,10 @@
     <div class="hud-stat big" id="hud-dist">0 m</div>
     <div class="hud-stat" id="hud-coins">● 0</div>
     <div class="hud-stat" id="hud-score">score 0</div>
+    <div class="hud-stat combo" id="hud-combo"></div>
   </div>
   <div class="hud-right">
+    <div class="hud-stat" id="hud-power"></div>
     <div class="hud-stat" id="hud-mount"></div>
     <button class="icon-btn" id="btn-pause" title="Pause (Esc)">⏸</button>
     <button class="icon-btn" id="btn-fullscreen" title="Fullscreen">⛶</button>
@@ -40,7 +42,8 @@
     <p class="help">
       <b>Hold</b> (space / click / touch) to jump.<br>
       <b>Keep holding</b> in the air to backflip — land flips for speed boosts.<br>
-      Dodge rocks, grab coins, and ride animals. Don't get caught!
+      Hit <b>ramps</b> for big air, grab 🧲 🛡 🚀 <b>power-ups</b>,<br>
+      dodge rocks, collect coins, and ride animals. Don't get caught!
     </p>
   </div>
 </div>
@@ -77,6 +80,10 @@
           <input type="range" data-key="coins" min="0" max="2" step="0.1"><output></output></label>
         <label class="row slider">Animals
           <input type="range" data-key="animals" min="0" max="2" step="0.1"><output></output></label>
+        <label class="row slider">Ramps
+          <input type="range" data-key="ramps" min="0" max="2" step="0.1"><output></output></label>
+        <label class="row slider">Power-ups
+          <input type="range" data-key="powerups" min="0" max="2" step="0.1"><output></output></label>
       </fieldset>
 
       <fieldset>

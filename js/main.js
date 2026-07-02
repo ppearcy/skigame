@@ -70,7 +70,10 @@ class Game {
     this.floaters = [];
     this.debris = [];
     this.trail = [];
+    this.rings = []; // expanding shockwave rings (perfect landings, pickups)
     this.poses = []; // recent player poses, for the high-speed ghost trail
+    this.power = null;        // active timed power-up: { kind, t }
+    this.nextMilestone = 500; // next distance celebration (m)
     this.time = 0;
     this.shake = 0;
     this.dieTimer = 0;
@@ -274,6 +277,32 @@ class Game {
       this.checkCollisions();
       this.avalanche.update(dt, p);
       if (this.avalanche.caught(p)) this.die(true);
+
+      // timed power-up ticks down
+      if (this.power) {
+        this.power.t -= dt;
+        if (this.power.t <= 0) this.power = null;
+      }
+      // magnet: nearby coins swarm toward the skier
+      if (this.power?.kind === 'magnet') {
+        for (const it of this.entities.items) {
+          if (it.type !== 'coin' || it.dead) continue;
+          const dx = p.cx - it.x, dy = p.cy - it.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 1 && d < 380) {
+            const pull = (500 + (380 - d) * 4.5) * dt / d;
+            it.x += dx * pull;
+            it.y += dy * pull;
+          }
+        }
+      }
+      // distance milestones deserve a little party
+      if (p.x / PX_PER_M >= this.nextMilestone) {
+        this.float(p.x, p.y - 115, `${this.nextMilestone} m!`, '#b0e8ff', 22);
+        this.ring(p.x, p.y - 40, '#b0e8ff');
+        this.sound.milestone();
+        this.nextMilestone += 500;
+      }
     } else {
       this.avalanche.front = p.x - 4000; // keep it offstage behind the menu
     }
@@ -293,6 +322,16 @@ class Game {
           });
         }
       }
+      // snowmobile chugs out little exhaust puffs
+      if (p.mount === 'snowmobile' && Math.random() < 0.45) {
+        this.particles.push({
+          x: p.x - 30, y: p.y - 8,
+          vx: -p.vx * 0.15 + (Math.random() - 0.5) * 40,
+          vy: -30 - Math.random() * 50,
+          life: 0.5 + Math.random() * 0.3, maxLife: 0.8,
+          size: 3 + Math.random() * 3, color: '#9aa7b5', grav: -60,
+        });
+      }
     } else if (p.state === 'crash') {
       // churned-up snow billowing around the tumbling skier
       for (let i = 0; i < 3; i++) {
@@ -306,12 +345,38 @@ class Game {
       }
     }
 
+    // rocket flame streaming behind the skier
+    if (p.boostTimer > 0 && (p.state === 'ground' || p.state === 'air')) {
+      for (let i = 0; i < 2; i++) {
+        this.particles.push({
+          x: p.x - 14 + (Math.random() - 0.5) * 8,
+          y: p.y - 14 + (Math.random() - 0.5) * 10,
+          vx: -p.vx * 0.35 + (Math.random() - 0.5) * 70,
+          vy: (Math.random() - 0.5) * 90,
+          life: 0.28 + Math.random() * 0.14, maxLife: 0.42,
+          size: 2.5 + Math.random() * 3.5,
+          color: Math.random() < 0.5 ? '#ffb03a' : '#ff5e3a', grav: -120,
+        });
+      }
+    }
+
     this.updateFx(dt);
     this.updateCamera(dt);
 
     if (!this.demo) {
-      this.ui.updateHUD(p.x / PX_PER_M, this.coins, this.score, p.mount);
+      this.ui.updateHUD(p.x / PX_PER_M, this.coins, this.score, p.mount, p.combo, this.powerLabel());
     }
+  }
+
+  // short status string for the HUD power-up slot
+  powerLabel() {
+    const p = this.player;
+    let txt = '';
+    if (p.shield) txt += '🛡 ';
+    if (this.power) {
+      txt += `${this.power.kind === 'magnet' ? '🧲' : '🚀'} ${Math.ceil(this.power.t)}s`;
+    }
+    return txt.trim();
   }
 
   handleEvents() {
@@ -328,6 +393,19 @@ class Game {
             this.burst(p.x, p.y, Math.min(6 + ev.air * 10, 18), '#ffffff', 200);
             if (ev.air > 0.6) this.shake = Math.max(this.shake, 4);
           }
+          if (ev.perfect) {
+            const pts = 50;
+            this.trickScore += pts;
+            this.float(p.x, p.y - 52, `PERFECT! +${pts}`, '#7ef2c0', 15);
+            this.ring(p.x, p.y - 8, '#7ef2c0');
+            this.sound.perfect();
+          }
+          break;
+        case 'ramp':
+          this.sound.ramp();
+          this.buzz(10);
+          this.burst(p.x, p.y + 6, 10, '#ffffff', 220);
+          this.float(p.x, p.y - 62, 'BIG AIR!', '#ffd75e', 15);
           break;
         case 'flip': {
           const pts = 100 * ev.n * (1 + 0.25 * (ev.combo - 1));
@@ -386,19 +464,46 @@ class Game {
       if (it.dead) continue;
       const dx = it.x - px;
       if (dx < -80 || dx > 80) continue;
+
+      // skiing across a kicker's lip fires the launch (no circle test)
+      if (it.type === 'ramp') {
+        if (!it.used && p.state === 'ground' && px >= it.x - 10 && px <= it.x + 60) {
+          it.used = true;
+          p.launchRamp();
+        }
+        continue;
+      }
+
       const dy = (it.y + (it.bob || 0)) - py;
       const rr = it.r + 24;
-      if (dx * dx + dy * dy > rr * rr) continue;
+      if (dx * dx + dy * dy > rr * rr) {
+        // dodging a rock by a hair pays out once it's safely behind you
+        if (it.type === 'rock' && !it.passed && px > it.x + 12) {
+          it.passed = true;
+          if (p.state !== 'crash' && p.grace <= 0) {
+            const clear = Math.hypot(px - it.x, py - (it.y - it.r));
+            if (clear < 130) {
+              this.trickScore += 25;
+              this.float(it.x, it.y - it.r - 34, 'CLOSE! +25', '#ffb0d8', 13);
+            }
+          }
+        }
+        continue;
+      }
 
       if (it.type === 'coin') {
         it.dead = true;
         this.coins++;
         this.sound.coin();
         this.burst(it.x, it.y, 6, '#ffd75e', 150);
+      } else if (it.type === 'powerup') {
+        if (p.state === 'crash') continue;
+        it.dead = true;
+        this.collectPowerup(it);
       } else if (it.type === 'rock') {
         if (p.state === 'crash' || p.grace > 0) continue;
         it.dead = true;
-        if (p.mount === 'yeti') {
+        if (p.mount === 'yeti' || p.boostTimer > 0) {
           this.trickScore += 50;
           this.sound.smash();
           this.shake = Math.max(this.shake, 6);
@@ -409,6 +514,13 @@ class Game {
           this.sound.smash();
           this.shake = Math.max(this.shake, 8);
           this.burst(it.x, it.y - 10, 16, '#d8342c', 340);
+        } else if (p.shield) {
+          p.shield = false;
+          this.sound.smash();
+          this.shake = Math.max(this.shake, 6);
+          this.float(it.x, it.y - 50, 'SHIELD!', '#7ee8f2', 16);
+          this.burst(it.x, it.y - 10, 16, '#7ee8f2', 340);
+          this.ring(p.x, p.y - 16, '#7ee8f2');
         } else {
           p.crash();
         }
@@ -418,6 +530,29 @@ class Game {
         p.setMount(it.kind);
       }
     }
+  }
+
+  collectPowerup(it) {
+    const p = this.player;
+    switch (it.kind) {
+      case 'magnet':
+        this.power = { kind: 'magnet', t: 7 };
+        this.float(p.x, p.y - 70, '🧲 MAGNET!', '#6fc3ff', 17);
+        break;
+      case 'shield':
+        p.shield = true;
+        this.float(p.x, p.y - 70, '🛡 SHIELD!', '#7ee8f2', 17);
+        break;
+      case 'rocket':
+        p.boostTimer = 4.5;
+        this.power = { kind: 'rocket', t: 4.5 };
+        this.float(p.x, p.y - 70, '🚀 ROCKET!', '#ffb03a', 17);
+        break;
+    }
+    this.sound.powerup();
+    this.buzz(12);
+    this.ring(it.x, it.y, '#ffffff');
+    this.burst(it.x, it.y, 12, '#ffffff', 240);
   }
 
   updateFx(dt) {
@@ -434,6 +569,12 @@ class Game {
       f.y -= 46 * dt;
     }
     this.floaters = this.floaters.filter(f => f.life > 0);
+
+    for (const r of this.rings) {
+      r.life -= dt;
+      r.r += 320 * dt;
+    }
+    this.rings = this.rings.filter(r => r.life > 0);
 
     // loose skis: fly, spin, then stick in the snow and fade
     for (const d of this.debris) {
@@ -485,6 +626,10 @@ class Game {
 
   float(x, y, text, color, size) {
     this.floaters.push({ x, y, text, color, size, life: 1.25 });
+  }
+
+  ring(x, y, color) {
+    this.rings.push({ x, y, color, r: 12, life: 0.45 });
   }
 
   // ------------------------------------------------------------------ render
@@ -554,11 +699,46 @@ class Game {
       }
 
       drawPlayer(ctx, p, this.settings, this.time);
+
+      // shield bubble hugging the skier
+      if (p.shield) {
+        const pulse = 0.35 + 0.15 * Math.sin(this.time * 6);
+        ctx.strokeStyle = `rgba(126,232,242,${pulse + 0.25})`;
+        ctx.fillStyle = `rgba(126,232,242,${pulse * 0.25})`;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(p.cx, p.cy, 36 + Math.sin(this.time * 4) * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      // magnet field shimmer
+      if (this.power?.kind === 'magnet') {
+        const a = 0.22 + 0.1 * Math.sin(this.time * 8);
+        ctx.strokeStyle = `rgba(111,195,255,${a})`;
+        ctx.lineWidth = 2;
+        for (let k = 0; k < 2; k++) {
+          const rr = 48 + k * 22 + Math.sin(this.time * 5 + k * 2) * 5;
+          ctx.beginPath();
+          ctx.arc(p.cx, p.cy, rr, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
     }
 
     if (!this.demo) {
       drawAvalanche(ctx, this.avalanche, this.terrain, theme, left, this.time);
     }
+
+    // expanding celebration rings
+    for (const r of this.rings) {
+      ctx.globalAlpha = clamp(r.life / 0.45, 0, 1) * 0.8;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
 
     // particles
     for (const pt of this.particles) {

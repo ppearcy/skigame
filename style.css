@@ -60,6 +60,8 @@ html, body {
 .hud-stat:empty { display: none; }
 #hud-coins { color: #ffd75e; }
 #hud-mount { font-size: 15px; color: #d8f3ff; }
+#hud-combo { color: #9fd8ff; font-size: 15px; }
+#hud-power { font-size: 15px; color: #ffe9b8; }
 .icon-btn {
   pointer-events: auto;
   background: rgba(10, 30, 60, .35);

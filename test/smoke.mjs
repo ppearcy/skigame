@@ -182,13 +182,27 @@ for (const theme of ['day', 'sunset', 'night']) {
   pump(10);
 }
 Object.assign(game.settings, {
-  steepness: 1.6, hilliness: 2, rocks: 2, coins: 2, animals: 2,
+  steepness: 1.6, hilliness: 2, rocks: 2, coins: 2, animals: 2, ramps: 2, powerups: 2,
   speed: 1.5, gravity: 0.7, avalanche: 2, snowfall: true,
 });
 game.startRun();
 pump(400);
+
+// 7b. every entity type appears when the spawner sweeps a long stretch
+{
+  const { Entities } = await import('../js/entities.js');
+  const { Terrain } = await import('../js/terrain.js');
+  const { DEFAULTS } = await import('../js/config.js');
+  const t = new Terrain({ ...DEFAULTS }, 999);
+  const e = new Entities({ ...DEFAULTS }, t, 999);
+  e.update(0.016, 0, 40000, 0);
+  const types = new Set(e.items.map(it => it.type));
+  for (const ty of ['rock', 'coin', 'animal', 'ramp', 'powerup']) {
+    assert.ok(types.has(ty), `${ty} entities spawn`);
+  }
+}
 Object.assign(game.settings, {
-  steepness: 0.6, hilliness: 0.3, rocks: 0, coins: 0, animals: 0,
+  steepness: 0.6, hilliness: 0.3, rocks: 0, coins: 0, animals: 0, ramps: 0, powerups: 0,
   speed: 0.7, gravity: 1.5, avalanche: 0.4, snowfall: false,
 });
 game.startRun();

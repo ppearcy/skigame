@@ -80,11 +80,13 @@ export class UI {
     $('hud').classList.remove('hidden');
   }
 
-  updateHUD(dist, coins, score, mount) {
+  updateHUD(dist, coins, score, mount, combo, power) {
     $('hud-dist').textContent = `${Math.floor(dist)} m`;
     $('hud-coins').textContent = `● ${coins}`;
     $('hud-score').textContent = `score ${Math.floor(score).toLocaleString()}`;
+    $('hud-combo').textContent = combo > 1 ? `combo ×${combo}` : '';
     $('hud-mount').textContent = mount ? MOUNTS[mount].label : '';
+    $('hud-power').textContent = power || '';
   }
 
   showGameOver(stats, isBest) {

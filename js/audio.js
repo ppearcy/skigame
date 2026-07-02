@@ -67,6 +67,12 @@ export class Sound {
   thud()  { this.noise(0.12, { vol: 0.13, low: true }); }
   mount() { this.tone(620, 0.09, { type: 'triangle', vol: 0.12 }); this.tone(930, 0.12, { type: 'triangle', vol: 0.12, delay: 0.08 }); }
   smash() { this.noise(0.25, { vol: 0.22 }); this.tone(110, 0.2, { type: 'square', vol: 0.1, slide: -60 }); }
+  ramp()  { this.noise(0.2, { vol: 0.12 }); this.tone(340, 0.28, { type: 'sine', vol: 0.12, slide: 380 }); }
+  powerup() {
+    [660, 990, 1320].forEach((f, k) => this.tone(f, 0.11, { type: 'triangle', vol: 0.11, delay: k * 0.07 }));
+  }
+  perfect() { this.tone(1100, 0.08, { type: 'sine', vol: 0.1 }); this.tone(1650, 0.14, { type: 'sine', vol: 0.09, delay: 0.05 }); }
+  milestone() { this.tone(784, 0.1, { type: 'triangle', vol: 0.11 }); this.tone(1046, 0.18, { type: 'triangle', vol: 0.11, delay: 0.09 }); }
   gameOver() {
     this.noise(0.9, { vol: 0.3, low: true });
     [380, 300, 226, 152].forEach((f, k) => this.tone(f, 0.26, { type: 'triangle', vol: 0.12, delay: k * 0.18 }));
