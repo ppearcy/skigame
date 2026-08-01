@@ -1,8 +1,10 @@
 # Alpine Dash ⛷️
 
-A customizable, browser-based endless skiing game inspired by *Ski Safari*.
-Race down an infinite procedurally-generated mountain, jump off crests, hold
-to backflip, ride animals, grab coins — and stay ahead of the avalanche.
+A customizable, browser-based endless skiing game. Race down an infinite
+procedurally-generated mountain that keeps changing character — wave ridges,
+mogul fields, kicker parks, cliff bands, steep plunges — jump off crests,
+hold to backflip, thread boost rings, ride animals, grab coins, and stay
+ahead of the avalanche.
 
 No build step, no dependencies: plain HTML5 canvas + ES modules.
 
@@ -26,8 +28,15 @@ or `npx serve`, or just deploy the folder to GitHub Pages / Netlify.
 | Release before landing | Land clean — flips give a speed boost + trick points |
 | Esc / P | Pause |
 
+- The mountain rolls through **terrain zones**, each announced as you enter:
+  - **Wave Ridge** — big surfable rollers; pump the crests for air
+  - **Mogul Field** — dense chatter bumps
+  - **Kicker Park** — built ramps with sharp lips; hit them fast
+  - **Cliff Bands** — ledges that drop away for huge natural airs
+  - **The Plunge** — long committed steeps; pure speed
 - Land sideways and you **crash** — the avalanche closes in fast while you tumble.
 - **Rocks** crash you. **Coins** are worth 25 points each.
+- **Boost rings** fling you forward (+25 pts). Long hang-time pays a **BIG AIR** bonus.
 - **Ride animals** by skiing into them:
   - 🐧 **Penguin** — faster, higher jumps
   - 🦍 **Yeti** — smashes straight through rocks (+50 each)
@@ -58,7 +67,7 @@ automatically if the device can't hold a smooth frame rate.
 | File | What it does |
 |---|---|
 | `js/main.js` | Game loop, input, camera, collisions, particles, scoring |
-| `js/terrain.js` | Infinite slope: downhill grade + two octaves of smoothed noise |
+| `js/terrain.js` | Infinite slope: base grade + noise octaves + rotating terrain zones |
 | `js/player.js` | Skier physics: slope sliding, jumps, flip rotation, crashes |
 | `js/entities.js` | Spawning of rocks, coin lines/arcs, and rideable animals |
 | `js/avalanche.js` | Rubber-banded chase logic keyed off smoothed player speed |

@@ -5,8 +5,8 @@ import { clamp, lerp, normAngle } from './config.js';
 // sound / particles / score.
 
 const MIN_SPEED = 150;
-const FLIP_ROT = Math.PI * 1.45;   // rotation counted as one full flip
-const CRASH_ANGLE = 1.35;          // landing tolerance (rad off the slope)
+const FLIP_ROT = Math.PI * 1.30;   // rotation counted as one full flip
+const CRASH_ANGLE = 1.50;          // landing tolerance (rad off the slope)
 
 export const MOUNTS = {
   penguin:    { label: '🐧 Penguin',    thrust: 175, jump: 1.18, height: 17 },
@@ -47,7 +47,7 @@ export class Player {
 
   press() {
     if (this.state === 'ground' || (this.state === 'air' && this.sinceGround < 0.09)) {
-      const power = 860 * this.jumpMult();
+      const power = 950 * this.jumpMult();
       this.vy -= power;
       this.state = 'air';
       this.airTime = 0;
@@ -128,22 +128,23 @@ export class Player {
     this.sinceGround += dt;
 
     // held => wind up a backflip (counter-clockwise while travelling right)
-    const targetAV = held ? -12.5 : 0;
-    const ramp = held ? 42 : 34; // fast wind-up, quick stop on release
+    const targetAV = held ? -14 : 0;
+    const ramp = held ? 60 : 40; // near-instant wind-up, quick stop on release
     this.angVel += clamp(targetAV - this.angVel, -ramp * dt, ramp * dt);
     this.angle += this.angVel * dt;
     if (this.angVel < 0) this.trickRot += -this.angVel * dt;
 
-    // gentle auto-level toward the slope once the spin has wound down,
-    // so releasing in time recovers a slightly under-rotated flip
-    if (!held && Math.abs(this.angVel) < 3.5) {
+    // auto-level toward the slope once the spin has wound down, so releasing
+    // in time recovers an under- or over-rotated flip
+    if (!held && Math.abs(this.angVel) < 4.5) {
       const theta = Math.atan(terrain.slopeAt(this.x));
       const diff = normAngle(theta - this.angle);
-      const assist = 5.0 * dt;
+      const assist = 7.5 * dt;
       this.angle += clamp(diff, -assist, assist);
     }
 
-    this.vy += this.grav * dt;
+    // holding tucks the skier: slightly floatier arc buys flip time
+    this.vy += this.grav * (held ? 0.88 : 1) * dt;
     this.vx -= this.dragK() * 0.4 * this.vx * this.vx * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;

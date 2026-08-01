@@ -121,6 +121,29 @@ assert.ok(game.avalanche.front < game.player.x, 'avalanche trails the player');
   console.log(`  flip physics: airtime=${air.toFixed(2)}s outcome=${flipEvent ? `${flipEvent.n} flip(s)` : p.state}`);
 }
 
+// 3a2. terrain zones: varied, continuous, and generally downhill
+{
+  const { Terrain, ZONE_LEN } = await import('../js/terrain.js');
+  const { DEFAULTS } = await import('../js/config.js');
+  const t = new Terrain({ ...DEFAULTS }, 424242);
+  const seen = new Set();
+  for (let x = 0; x < ZONE_LEN * 40; x += 400) seen.add(t.zoneTypeAt(x));
+  assert.ok(seen.size >= 5, `long runs should hit varied zones (saw ${[...seen].join(', ')})`);
+
+  // continuity: no teleport steps, and slopes stay physically rideable
+  let maxStep = 0;
+  let prev = t.groundY(-2000);
+  for (let x = -1999; x < ZONE_LEN * 12; x++) {
+    const y = t.groundY(x);
+    maxStep = Math.max(maxStep, Math.abs(y - prev));
+    prev = y;
+  }
+  assert.ok(maxStep < 8, `terrain must be continuous (max 1px step=${maxStep.toFixed(2)})`);
+  assert.ok(t.groundY(ZONE_LEN * 12) > t.groundY(0) + ZONE_LEN * 12 * 0.2,
+    'terrain trends firmly downhill');
+  console.log(`  terrain: ${seen.size} zone types, max step ${maxStep.toFixed(2)}px`);
+}
+
 // 3b. jump + hold-then-release tricks, repeatedly, for ~30s of game time
 let sawAir = false;
 let crashes = 0;

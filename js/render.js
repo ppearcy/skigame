@@ -348,6 +348,7 @@ function drawTrees(ctx, terrain, theme, left, right) {
     const h = hash2(terrain.seed, i);
     if (h > 0.34) continue;
     const x = i * seg + (h * 977 % 1) * seg;
+    if (Math.abs(terrain.slopeAt(x)) > 1.1) continue; // no trees on cliff faces
     const size = 26 + h * 80;
     const y = terrain.groundY(x) + 2;
     drawPine(ctx, x, y, size, theme);
@@ -390,7 +391,50 @@ export function drawEntity(ctx, it, time, theme) {
     case 'rock': drawRock(ctx, it); break;
     case 'coin': drawCoin(ctx, it, time); break;
     case 'animal': drawAnimal(ctx, it, time); break;
+    case 'boost': drawBoost(ctx, it, time); break;
   }
+}
+
+// glowing ring: fly through it for a burst of speed
+function drawBoost(ctx, it, time) {
+  const y = it.y + (it.bob || 0);
+  const pulse = 1 + 0.09 * Math.sin(time * 5 + it.phase);
+  const r = it.r * pulse;
+
+  const glow = ctx.createRadialGradient(it.x, y, r * 0.2, it.x, y, r * 2.6);
+  glow.addColorStop(0, 'rgba(90,240,200,0.30)');
+  glow.addColorStop(1, 'rgba(90,240,200,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(it.x, y, r * 2.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#5af0c8';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.arc(it.x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(it.x, y, r * 0.62, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // chevrons pointing the way
+  ctx.strokeStyle = '#eafffa';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 2; k++) {
+    const ox = it.x - 6 + k * 9;
+    ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(time * 4 + it.phase + k));
+    ctx.beginPath();
+    ctx.moveTo(ox - 4, y - 7);
+    ctx.lineTo(ox + 4, y);
+    ctx.lineTo(ox - 4, y + 7);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawRock(ctx, it) {

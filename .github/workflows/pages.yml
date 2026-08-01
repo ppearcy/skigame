@@ -4,7 +4,7 @@ name: Publish to GitHub Pages
 # development branch so every push updates the live game.
 on:
   push:
-    branches: [claude/fervent-wright-ghtta7, main]
+    branches: [claude/game-terrain-variance-s7a0b9, claude/fervent-wright-ghtta7, main]
   workflow_dispatch:
 
 permissions:

@@ -9,6 +9,16 @@ import { UI } from './ui.js';
 
 const PX_PER_M = 40;
 
+// splashy call-outs when the mountain changes character
+const ZONE_INFO = {
+  cruise:  { label: 'OPEN SLOPES',      color: '#ffffff' },
+  rollers: { label: '〜 WAVE RIDGE 〜',  color: '#9fd8ff' },
+  moguls:  { label: '⁂ MOGUL FIELD ⁂',  color: '#cfe3ff' },
+  kickers: { label: '⛷ KICKER PARK ⛷', color: '#ffd75e' },
+  cliffs:  { label: '⚠ CLIFF BANDS ⚠',  color: '#ff9f7a' },
+  steep:   { label: '▼ THE PLUNGE ▼',   color: '#ff5e4e' },
+};
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('game');
@@ -74,6 +84,8 @@ class Game {
     this.time = 0;
     this.shake = 0;
     this.dieTimer = 0;
+    this.lastZoneType = this.terrain.zoneTypeAt(0);
+    this.banner = null;
     this.cam.x = this.player.x - 300;
     this.cam.y = this.player.y - 300;
     this.cam.zoom = 1;
@@ -310,6 +322,16 @@ class Game {
     this.updateCamera(dt);
 
     if (!this.demo) {
+      // announce the mountain changing character
+      const zt = this.terrain.zoneTypeAt(p.x);
+      if (zt !== this.lastZoneType) {
+        this.lastZoneType = zt;
+        const info = ZONE_INFO[zt];
+        if (info) {
+          this.banner = { text: info.label, color: info.color, life: 2.3, max: 2.3 };
+          this.sound.zone();
+        }
+      }
       this.ui.updateHUD(p.x / PX_PER_M, this.coins, this.score, p.mount);
     }
   }
@@ -327,6 +349,12 @@ class Game {
           if (ev.air > 0.3) {
             this.burst(p.x, p.y, Math.min(6 + ev.air * 10, 18), '#ffffff', 200);
             if (ev.air > 0.6) this.shake = Math.max(this.shake, 4);
+          }
+          // hang-time is its own trick: cliffs and kickers pay out
+          if (ev.air > 1.0 && !this.demo) {
+            const pts = Math.floor(40 * ev.air);
+            this.trickScore += pts;
+            this.float(p.x, p.y - 48, `BIG AIR +${pts}`, '#9fd8ff', 15);
           }
           break;
         case 'flip': {
@@ -416,6 +444,18 @@ class Game {
         if (p.state === 'crash') continue;
         it.dead = true;
         p.setMount(it.kind);
+      } else if (it.type === 'boost') {
+        if (p.state === 'crash') continue;
+        it.dead = true;
+        const sp = Math.max(p.speed, 1);
+        const ns = sp * 1.22 + 230;
+        p.vx *= ns / sp;
+        p.vy *= ns / sp;
+        this.trickScore += 25;
+        this.sound.boost();
+        this.buzz(10);
+        this.float(it.x, it.y - 44, 'BOOST! +25', '#5af0c8', 17);
+        this.burst(it.x, it.y, 12, '#5af0c8', 260);
       }
     }
   }
@@ -618,6 +658,28 @@ class Game {
     }
     ctx.fillStyle = this._vig;
     ctx.fillRect(0, 0, w, h);
+
+    // zone banner: slides in at the top, holds, fades
+    if (this.banner && this.state === 'playing' && !this.demo) {
+      const b = this.banner;
+      b.life -= dt;
+      if (b.life <= 0) {
+        this.banner = null;
+      } else {
+        const tIn = clamp((b.max - b.life) / 0.25, 0, 1);
+        const aOut = clamp(b.life / 0.5, 0, 1);
+        ctx.globalAlpha = tIn * aOut;
+        ctx.font = '800 30px "Trebuchet MS", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(10,25,50,0.6)';
+        const by = h * 0.15 + (1 - tIn) * -26;
+        ctx.strokeText(b.text, w / 2, by);
+        ctx.fillStyle = b.color;
+        ctx.fillText(b.text, w / 2, by);
+        ctx.globalAlpha = 1;
+      }
+    }
 
     if (this.state === 'playing' && !this.demo) {
       const dist = this.avalanche.distanceTo(this.player);
