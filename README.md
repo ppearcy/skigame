@@ -27,7 +27,12 @@ or `npx serve`, or just deploy the folder to GitHub Pages / Netlify.
 | Esc / P | Pause |
 
 - Land sideways and you **crash** — the avalanche closes in fast while you tumble.
-- **Rocks** crash you. **Coins** are worth 25 points each.
+- **Rocks** crash you — but they arrive in designed, always-clearable patterns
+  whose spacing scales with your speed, Geometry Dash style. Warning signs
+  telegraph the harder clusters, and coin arcs trace the jump line over them.
+- **Dodging pays**: shave past a rock for a **CLOSE!** bonus, and chain clean
+  dodges into a **streak** for milestone payouts (a crash resets it).
+- **Coins** are worth 25 points each.
 - **Ride animals** by skiing into them:
   - 🐧 **Penguin** — faster, higher jumps
   - 🦍 **Yeti** — smashes straight through rocks (+50 each)
@@ -60,7 +65,7 @@ automatically if the device can't hold a smooth frame rate.
 | `js/main.js` | Game loop, input, camera, collisions, particles, scoring |
 | `js/terrain.js` | Infinite slope: downhill grade + two octaves of smoothed noise |
 | `js/player.js` | Skier physics: slope sliding, jumps, flip rotation, crashes |
-| `js/entities.js` | Spawning of rocks, coin lines/arcs, and rideable animals |
+| `js/entities.js` | Speed-aware rock patterns, warning signs, coin lines/arcs, rideable animals |
 | `js/avalanche.js` | Rubber-banded chase logic keyed off smoothed player speed |
 | `js/render.js` | Themes, parallax background, terrain, characters, avalanche |
 | `js/audio.js` | Procedural WebAudio sound effects (no asset files) |

@@ -46,7 +46,7 @@ export class Player {
   dragK() { return 0.00046 / (this.s.speed * this.s.speed); }
 
   press() {
-    if (this.state === 'ground' || (this.state === 'air' && this.sinceGround < 0.09)) {
+    if (this.state === 'ground' || (this.state === 'air' && this.sinceGround < 0.12)) {
       const power = 860 * this.jumpMult();
       this.vy -= power;
       this.state = 'air';

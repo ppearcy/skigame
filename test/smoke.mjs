@@ -195,4 +195,37 @@ game.startRun();
 pump(400);
 assert.ok(game.entities.items.length === 0, 'density 0 disables all spawns');
 
+// 8. rock patterns stay fair: clusters are tight enough to clear in one jump,
+// and consecutive challenges always leave reaction room between them
+{
+  const { Entities } = await import('../js/entities.js');
+  const { Terrain } = await import('../js/terrain.js');
+  const { DEFAULTS } = await import('../js/config.js');
+  const t = new Terrain({ ...DEFAULTS }, 4242);
+  const e = new Entities({ ...DEFAULTS }, t, 4242);
+  for (let cam = 0; cam < 60000; cam += 400) e.update(1 / 60, 0, cam + 1280, 0, 900);
+  const rocks = e.items.filter(i => i.type === 'rock').map(i => i.x).sort((a, b) => a - b);
+  assert.ok(rocks.length > 20, `pattern spawner produces rocks (${rocks.length})`);
+
+  // group rocks into clusters (a one-jump unit spans well under 200px)
+  const clusters = [[rocks[0]]];
+  for (let i = 1; i < rocks.length; i++) {
+    if (rocks[i] - rocks[i - 1] < 200) clusters[clusters.length - 1].push(rocks[i]);
+    else clusters.push([rocks[i]]);
+  }
+  let minGap = Infinity;
+  for (let i = 1; i < clusters.length; i++) {
+    minGap = Math.min(minGap, clusters[i][0] - clusters[i - 1].at(-1));
+  }
+  assert.ok(minGap >= 320, `clusters leave reaction room (min gap ${Math.floor(minGap)}px)`);
+  for (const c of clusters) {
+    const width = c.at(-1) - c[0];
+    assert.ok(width <= 200, `cluster clearable in one jump (width ${Math.floor(width)}px)`);
+    assert.ok(c.length <= 3, `cluster size capped (${c.length})`);
+  }
+  const signs = e.items.filter(i => i.type === 'sign');
+  assert.ok(signs.length > 0, 'harder patterns are telegraphed by warning signs');
+  console.log(`  patterns: ${clusters.length} clusters, min gap ${Math.floor(minGap)}px, ${signs.length} signs`);
+}
+
 console.log('✔ smoke test passed');

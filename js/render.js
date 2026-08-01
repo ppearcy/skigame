@@ -390,7 +390,35 @@ export function drawEntity(ctx, it, time, theme) {
     case 'rock': drawRock(ctx, it); break;
     case 'coin': drawCoin(ctx, it, time); break;
     case 'animal': drawAnimal(ctx, it, time); break;
+    case 'sign': drawSign(ctx, it, time); break;
   }
+}
+
+// striped warning sign telegraphing a rock cluster ahead
+function drawSign(ctx, it, time) {
+  const { x, y } = it;
+  ctx.fillStyle = '#5d4a37';
+  ctx.fillRect(x - 2.5, y - 48, 5, 48);
+  const wob = Math.sin(time * 2.4 + x * 0.01) * 0.04;
+  ctx.save();
+  ctx.translate(x, y - 60);
+  ctx.rotate(Math.PI / 4 + wob);
+  const s = 15;
+  ctx.fillStyle = '#ffb52e';
+  ctx.fillRect(-s, -s, s * 2, s * 2);
+  ctx.strokeStyle = '#2b323c';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-s + 1.5, -s + 1.5, s * 2 - 3, s * 2 - 3);
+  ctx.restore();
+  ctx.fillStyle = '#2b323c';
+  ctx.font = '800 20px "Trebuchet MS", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('!', x, y - 53);
+  // snow cap
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 76, 9, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawRock(ctx, it) {

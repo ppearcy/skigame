@@ -66,6 +66,7 @@ class Game {
     this.bg = new Background(seed ^ 0x1234);
     this.coins = 0;
     this.trickScore = 0;
+    this.dodgeStreak = 0;
     this.particles = [];
     this.floaters = [];
     this.debris = [];
@@ -268,7 +269,7 @@ class Game {
 
     const camLeft = this.cam.x;
     const camRight = this.cam.x + this.w / this.cam.zoom;
-    this.entities.update(dt, camLeft, camRight, this.time);
+    this.entities.update(dt, camLeft, camRight, this.time, p.speed);
 
     if (!this.demo) {
       this.checkCollisions();
@@ -341,6 +342,7 @@ class Game {
           break;
         }
         case 'crash':
+          this.dodgeStreak = 0;
           this.sound.crash();
           this.buzz([30, 40, 30]);
           this.shake = Math.max(this.shake, 13);
@@ -383,12 +385,24 @@ class Game {
     const px = p.cx, py = p.cy;
 
     for (const it of this.entities.items) {
-      if (it.dead) continue;
+      if (it.dead || it.type === 'sign') continue;
       const dx = it.x - px;
-      if (dx < -80 || dx > 80) continue;
+      if (dx > 80) continue;
+      if (dx < -80) {
+        this.creditDodge(it); // fell behind between frames — still counts
+        continue;
+      }
       const dy = (it.y + (it.bob || 0)) - py;
-      const rr = it.r + 24;
-      if (dx * dx + dy * dy > rr * rr) continue;
+      // hazards get a tight, player-favoring hitbox; pickups stay generous
+      const rr = it.r + (it.type === 'rock' ? 10 : 26);
+      if (dx * dx + dy * dy > rr * rr) {
+        if (it.type === 'rock') {
+          const near = rr + 48;
+          if (dx * dx + dy * dy < near * near) it.close = true;
+          if (dx < -40) this.creditDodge(it); // safely behind the skier now
+        }
+        continue;
+      }
 
       if (it.type === 'coin') {
         it.dead = true;
@@ -396,7 +410,10 @@ class Game {
         this.sound.coin();
         this.burst(it.x, it.y, 6, '#ffd75e', 150);
       } else if (it.type === 'rock') {
-        if (p.state === 'crash' || p.grace > 0) continue;
+        if (p.state === 'crash' || p.grace > 0) {
+          it.cleared = true; // survived by invulnerability, not a dodge
+          continue;
+        }
         it.dead = true;
         if (p.mount === 'yeti') {
           this.trickScore += 50;
@@ -417,6 +434,29 @@ class Game {
         it.dead = true;
         p.setMount(it.kind);
       }
+    }
+  }
+
+  // a rock passed without a crash: build the dodge streak, and pay out extra
+  // for shaving it close — dodging is meant to score, not just to survive
+  creditDodge(it) {
+    if (it.type !== 'rock' || it.cleared) return;
+    it.cleared = true;
+    const p = this.player;
+    if (p.state !== 'ground' && p.state !== 'air') return;
+    this.dodgeStreak++;
+    if (it.close) {
+      const pts = 20 + 5 * Math.min(this.dodgeStreak, 16);
+      this.trickScore += pts;
+      this.float(it.x, it.y - 56, `CLOSE! +${pts}`, '#8ef1ff', 15);
+      this.sound.near();
+      this.buzz(6);
+    }
+    if (this.dodgeStreak % 10 === 0) {
+      const bonus = this.dodgeStreak * 10;
+      this.trickScore += bonus;
+      this.float(p.x, p.y - 92, `DODGE STREAK ×${this.dodgeStreak}! +${bonus}`, '#ffd75e', 18);
+      this.sound.streak();
     }
   }
 
@@ -462,7 +502,10 @@ class Game {
     const targetZoom = clamp(1.06 - p.speed * 0.00021, 0.8, 1.0);
     this.cam.zoom = lerp(this.cam.zoom, targetZoom, 1 - Math.exp(-2.2 * dt));
     const z = this.cam.zoom;
-    const tx = p.x - (this.w / z) * 0.34;
+    // slide the skier toward the left edge as speed rises: more of the slope
+    // ahead stays visible, so obstacles never outrun reaction time
+    const anchor = 0.34 - clamp((p.speed - 600) * 0.00006, 0, 0.10);
+    const tx = p.x - (this.w / z) * anchor;
     const ty = p.y - (this.h / z) * 0.52;
     this.cam.x = tx; // horizontal follow is exact to avoid speed wobble
     this.cam.y = lerp(this.cam.y, ty, 1 - Math.exp(-5.5 * dt));
