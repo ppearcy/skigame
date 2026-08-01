@@ -40,7 +40,8 @@
     <p class="help">
       <b>Hold</b> (space / click / touch) to jump.<br>
       <b>Keep holding</b> in the air to backflip — land flips for speed boosts.<br>
-      Dodge rocks, grab coins, and ride animals. Don't get caught!
+      Dodge rocks, grab coins, and ride animals. Don't get caught!<br>
+      <b>▶</b> markers on the right edge warn you about hazards still off-screen.
     </p>
   </div>
 </div>
@@ -77,6 +78,14 @@
           <input type="range" data-key="coins" min="0" max="2" step="0.1"><output></output></label>
         <label class="row slider">Animals
           <input type="range" data-key="animals" min="0" max="2" step="0.1"><output></output></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Camera</legend>
+        <label class="row slider">View distance
+          <input type="range" data-key="view" min="0.8" max="1.8" step="0.05"><output></output></label>
+        <label class="row check"><input type="checkbox" data-key="hazardMarkers"> Off-screen hazard markers</label>
+        <p class="hint">Higher view distance pulls the camera back so you spot rocks and jumps earlier.</p>
       </fieldset>
 
       <fieldset>

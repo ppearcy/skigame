@@ -20,7 +20,9 @@ export class Entities {
   rand(lo, hi) { return lo + this.rng() * (hi - lo); }
 
   update(dt, camLeft, camRight, time) {
-    const spawnTo = camRight + 900;
+    // spawn well past the right edge: the camera can pull back a long way at
+    // speed, and the edge hazard markers read from this band too
+    const spawnTo = camRight + 1500;
 
     if (this.s.rocks > 0.05) {
       while (this.nextRock < spawnTo) {

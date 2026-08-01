@@ -4,7 +4,8 @@ A customizable, browser-based endless skiing game inspired by *Ski Safari*.
 Race down an infinite procedurally-generated mountain, jump off crests, hold
 to backflip, ride animals, grab coins — and stay ahead of the avalanche.
 
-No build step, no dependencies: plain HTML5 canvas + ES modules.
+No build step, no runtime dependencies: plain HTML5 canvas + ES modules.
+(Playwright is a dev dependency, used only by the browser tests.)
 
 ## Run it
 
@@ -26,6 +27,9 @@ or `npx serve`, or just deploy the folder to GitHub Pages / Netlify.
 | Release before landing | Land clean — flips give a speed boost + trick points |
 | Esc / P | Pause |
 
+- The camera rides well ahead of you and pulls back as you speed up, so
+  rocks and crests show up with time to set up a jump. Hazards that are still
+  off-screen get a **chevron on the right edge** with their distance.
 - Land sideways and you **crash** — the avalanche closes in fast while you tumble.
 - **Rocks** crash you. **Coins** are worth 25 points each.
 - **Ride animals** by skiing into them:
@@ -41,17 +45,24 @@ The **Customize** menu (saved to `localStorage`) lets you tune:
 
 - **Skier** — suit / scarf / ski colors, plus Day / Sunset / Night themes
 - **Mountain** — steepness, hilliness, and the density of rocks, coins, and animals (set any to 0 to disable)
+- **Camera** — view distance (how far ahead you see) and off-screen hazard markers
 - **Physics** — top speed, gravity, and avalanche aggression
 - **Effects** — snowfall, sound, screen shake, vibration (mobile)
 
-Physics and density sliders apply live; steepness/hilliness shape the next run.
+Camera, physics and density sliders apply live; steepness/hilliness shape the
+next run.
 
 ## Mobile
 
 The game is touch-first friendly: safe-area (notch) aware HUD, large touch
-targets, no pull-to-refresh or double-tap zoom, haptic feedback on jumps,
-flips, and crashes, and adaptive render resolution that steps down
-automatically if the device can't hold a smooth frame rate.
+targets, no pull-to-refresh or double-tap zoom, and haptic feedback on jumps,
+flips, and crashes.
+
+Narrow screens get extra camera pull-back, so a phone in portrait still sees a
+useful stretch of slope ahead. If a device can't hold a smooth frame rate the
+game steps down render resolution first, then drops decorative passes (drift
+lines, sparkles, god rays, the ridge treeline) — the wide view is the last
+thing to go, because it's what makes the game playable.
 
 ## Code tour
 
@@ -69,8 +80,22 @@ automatically if the device can't hold a smooth frame rate.
 
 ## Tests
 
-A headless smoke test exercises the full game loop under stubbed DOM/canvas:
+A headless smoke test exercises the full game loop under stubbed DOM/canvas —
+no browser needed:
 
 ```sh
-node test/smoke.mjs
+npm test
 ```
+
+A Playwright suite drives the real game in Chromium: menu, HUD, jumping,
+pausing, persistence, every theme, and the forward-visibility guarantees
+(lookahead distance, framing, phone viewports).
+
+```sh
+npx playwright install chromium   # once
+npm run test:e2e
+```
+
+Both run in CI on every push. To eyeball the graphics, `npm run shots` writes
+gameplay screenshots (desktop in each theme, plus a portrait phone) to
+`shots/`.

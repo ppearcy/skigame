@@ -14,6 +14,10 @@ export const DEFAULTS = {
   coins: 1.0,            // coin density (0 disables)
   animals: 1.0,          // rideable animal frequency (0 disables)
 
+  // camera
+  view: 1.2,             // how far ahead you see (zoom-out multiplier)
+  hazardMarkers: true,   // edge chevrons for hazards just past the right edge
+
   // physics / difficulty
   speed: 1.0,            // terminal speed multiplier
   gravity: 1.0,

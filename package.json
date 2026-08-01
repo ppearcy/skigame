@@ -6,6 +6,12 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8000",
-    "test": "node test/smoke.mjs"
+    "test": "node test/smoke.mjs",
+    "test:e2e": "playwright test",
+    "test:all": "node test/smoke.mjs && playwright test",
+    "shots": "node test/shots.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

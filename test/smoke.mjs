@@ -156,6 +156,36 @@ console.log(
 // 4. settings sliders are respected by spawners (0 disables)
 assert.ok(game.entities.items.length > 0, 'entities should spawn');
 
+// 4b. forward visibility: you need real runway to react to what's coming
+{
+  game.settings.view = 1.2;
+  game.startRun();
+  pump(180);
+  const base = game.lookahead / 40;
+  assert.ok(base > 28, `should see well down the slope (${base.toFixed(1)} m)`);
+
+  // the skier is framed left of centre, but not jammed against the edge
+  const frac = (game.player.x - game.cam.x) * game.cam.zoom / game.w;
+  assert.ok(frac > 0.1 && frac < 0.3, `skier framed left of centre (${frac.toFixed(2)})`);
+
+  // hazards exist beyond the right edge for the edge markers to point at
+  const edge = game.cam.x + game.w / game.cam.zoom;
+  assert.ok(game.entities.items.some(it => !it.dead && it.x > edge),
+    'entities should be spawned past the right edge');
+
+  // and the view setting actually widens the frame
+  game.settings.view = 1.8;
+  pump(180);
+  const wide = game.lookahead / 40;
+  game.settings.view = 0.8;
+  pump(180);
+  const narrow = game.lookahead / 40;
+  assert.ok(wide > narrow * 1.3,
+    `view setting should widen the frame (${narrow.toFixed(1)} m -> ${wide.toFixed(1)} m)`);
+  game.settings.view = 1.2;
+  console.log(`  visibility: ${base.toFixed(1)} m ahead (${narrow.toFixed(1)}–${wide.toFixed(1)} m across the view slider)`);
+}
+
 // 5. force a catch: park the player, the avalanche must close in and end the run
 if (game.state === 'playing') {
   game.player.state = 'crash';

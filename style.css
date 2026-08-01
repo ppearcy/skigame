@@ -203,6 +203,7 @@ legend { padding: 0 8px; font-weight: 700; color: #9fd8ff; letter-spacing: 1px; 
 .row.slider output { width: 38px; text-align: right; color: #9fd8ff; font-variant-numeric: tabular-nums; font-size: 13px; }
 .row.check { justify-content: flex-start; cursor: pointer; }
 .row.check input { width: 18px; height: 18px; accent-color: #3fa9f5; }
+.hint { font-size: 12px; line-height: 1.45; color: #8fb3d2; margin-top: 8px; }
 input[type="color"] {
   width: 52px; height: 30px;
   border: 1px solid rgba(140,200,255,.4);

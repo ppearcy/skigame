@@ -3,11 +3,18 @@ import { Terrain } from './terrain.js';
 import { Player, MOUNTS } from './player.js';
 import { Entities } from './entities.js';
 import { Avalanche } from './avalanche.js';
-import { Background, THEMES, drawTerrain, drawEntity, drawPlayer, drawPlayerShadow, drawAvalanche, drawDebris } from './render.js';
+import { Background, THEMES, setDetail, drawTerrain, drawEntity, drawPlayer, drawPlayerShadow, drawAvalanche, drawDebris } from './render.js';
 import { Sound } from './audio.js';
 import { UI } from './ui.js';
 
 const PX_PER_M = 40;
+
+// Camera framing. The skier sits well left of centre so most of the screen is
+// the ground you're about to cover, and the view pulls back as you speed up so
+// obstacles appear with enough warning to set up a jump.
+const ANCHOR_X = 0.22;     // skier's screen position, as a fraction of width
+const LEAD_PER_SPEED = 0.06; // extra world px of lookahead per px/s of speed
+const LEAD_MAX = 160;
 
 class Game {
   constructor() {
@@ -31,9 +38,11 @@ class Game {
     this.cam = { x: 0, y: 0, zoom: 1 };
     this.last = performance.now();
 
-    // adaptive resolution: starts at the device cap, steps down if the
-    // frame time stays high so weaker phones keep a smooth frame rate
+    // adaptive quality: starts at the device cap and steps down if the frame
+    // time stays high, so weaker phones keep a smooth frame rate — resolution
+    // first, then decorative render passes
     this.dprCap = 2;
+    this.detail = 1;
     this.frameAvg = 16;
     this.perfCheck = 0;
 
@@ -230,14 +239,22 @@ class Game {
     const dt = clamp(rawMs / 1000, 0, 1 / 30);
     this.last = now;
 
-    // sustained slow frames -> drop render resolution one notch
+    // sustained slow frames -> shed render resolution, then decoration
     this.frameAvg += (clamp(rawMs, 0, 100) - this.frameAvg) * 0.04;
     if (++this.perfCheck >= 150) {
       this.perfCheck = 0;
-      if (this.frameAvg > 26 && this.dprCap > 1) {
-        this.dprCap = Math.max(1, this.dprCap - 0.5);
-        this.frameAvg = 16;
-        this.resize();
+      if (this.frameAvg > 26) {
+        if (this.dprCap > 1) {
+          this.dprCap = Math.max(1, this.dprCap - 0.5);
+          this.frameAvg = 16;
+          this.resize();
+        } else if (this.detail > 0) {
+          // already at 1x: give up the decorative passes rather than the
+          // wider camera, which is what makes the game playable
+          this.detail = 0;
+          this.frameAvg = 16;
+          setDetail(0);
+        }
       }
     }
 
@@ -457,17 +474,80 @@ class Game {
     this.shake = Math.max(0, this.shake - 34 * dt);
   }
 
+  // world px of slope visible ahead of the skier — the number the "view
+  // distance" setting is really tuning
+  get lookahead() {
+    return this.cam.x + this.w / this.cam.zoom - this.player.x;
+  }
+
   updateCamera(dt) {
     const p = this.player;
-    const targetZoom = clamp(1.06 - p.speed * 0.00021, 0.8, 1.0);
+    // the view setting divides the zoom, so a bigger value pulls the camera
+    // back and puts more of the mountain on screen. Narrow windows (phones,
+    // especially in portrait) get extra pull-back, otherwise they'd see far
+    // less of the slope ahead than a desktop at the same setting.
+    const view = clamp(this.settings.view || 1, 0.8, 1.8)
+      * clamp(1100 / Math.max(this.w, 1), 1, 1.7);
+    const targetZoom = clamp(1.06 - p.speed * 0.00024, 0.78, 1.0) / view;
     this.cam.zoom = lerp(this.cam.zoom, targetZoom, 1 - Math.exp(-2.2 * dt));
     const z = this.cam.zoom;
-    const tx = p.x - (this.w / z) * 0.34;
-    const ty = p.y - (this.h / z) * 0.52;
+    // shift further forward the faster you go: high speed needs more warning
+    const lead = clamp(p.speed * LEAD_PER_SPEED, 0, LEAD_MAX);
+    const tx = p.x + lead - (this.w / z) * ANCHOR_X;
+    // Centre the band of slope that actually fits on screen. On a wide, steep
+    // view the ground ahead drops most of a screen height, so the skier rides
+    // high and the sky stops eating the frame; on a tall phone the drop is a
+    // thin diagonal, so the skier sits closer to the middle instead of leaving
+    // half the screen as blank snow.
+    const drop = (this.w * this.terrain.slope) / Math.max(this.h, 1);
+    const anchorY = clamp(0.5 - drop * 0.5, 0.26, 0.5);
+    const ty = p.y - (this.h / z) * anchorY;
     this.cam.x = tx; // horizontal follow is exact to avoid speed wobble
     this.cam.y = lerp(this.cam.y, ty, 1 - Math.exp(-5.5 * dt));
     const maxOff = (this.h / z) * 0.22;
     this.cam.y = clamp(this.cam.y, ty - maxOff, ty + maxOff);
+  }
+
+  // Chevrons pinned to the right edge for hazards that are still off-screen.
+  // Even with the pulled-back camera, top speed eats the screen quickly — this
+  // gives a beat of warning before a rock or a ride enters the frame.
+  drawHazardMarkers(ctx, w, h) {
+    const p = this.player;
+    const z = this.cam.zoom;
+    const edge = this.cam.x + w / z;   // world x at the right edge of the screen
+    const far = edge + 1200;           // how far past it we peek
+
+    for (const it of this.entities.items) {
+      if (it.dead || it.type === 'coin') continue;
+      if (it.x < edge + 20 || it.x > far) continue;
+
+      const near = 1 - (it.x - edge) / (far - edge); // 0 far away, 1 entering
+      const y = clamp((it.y - this.cam.y) * z, 46, h - 46);
+      const x = w - 26;
+      const rock = it.type === 'rock';
+
+      ctx.globalAlpha = 0.25 + near * 0.6;
+      ctx.fillStyle = rock ? '#ff6a4d' : '#8dff9d';
+      ctx.beginPath();
+      ctx.moveTo(x + 11, y);
+      ctx.lineTo(x - 6, y - 11);
+      ctx.lineTo(x - 6, y + 11);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.globalAlpha = 0.2 + near * 0.45;
+      ctx.strokeStyle = 'rgba(10,25,50,0.8)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.globalAlpha = 0.35 + near * 0.5;
+      ctx.font = '700 11px "Trebuchet MS", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#eaf4ff';
+      ctx.fillText(`${Math.round((it.x - p.x) / PX_PER_M)}m`, x - 10, y + 4);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
   }
 
   burst(x, y, n, color, spread) {
@@ -514,17 +594,31 @@ class Game {
 
     drawTerrain(ctx, this.terrain, theme, left, right, bottom, this.time);
 
-    // ski trail, fading out behind the skier
+    // ski tracks: two carved grooves with a bright lip, fading out behind
     if (this.trail.length > 1) {
-      ctx.strokeStyle = 'rgba(140,170,200,1)';
-      ctx.lineWidth = 3;
       ctx.lineCap = 'round';
-      for (let i = 1; i < this.trail.length; i++) {
-        ctx.globalAlpha = (i / this.trail.length) * 0.4;
-        ctx.beginPath();
-        ctx.moveTo(this.trail[i - 1].x, this.trail[i - 1].y);
-        ctx.lineTo(this.trail[i].x, this.trail[i].y);
-        ctx.stroke();
+      const passes = [
+        { dy: 0.5, width: 5, color: 'rgba(255,255,255,0.9)', alpha: 0.30 },
+        { dy: 2.5, width: 2.4, color: 'rgba(120,155,195,1)', alpha: 0.45 },
+        { dy: 6.0, width: 2.4, color: 'rgba(120,155,195,1)', alpha: 0.38 },
+      ];
+      // fade the tracks out in chunks: one stroke per chunk instead of one
+      // per segment, which matters now that more of the trail is on screen
+      const T = this.trail;
+      const CHUNKS = 8;
+      for (const pass of passes) {
+        ctx.strokeStyle = pass.color;
+        ctx.lineWidth = pass.width;
+        for (let c = 0; c < CHUNKS; c++) {
+          const i0 = Math.floor((T.length - 1) * c / CHUNKS);
+          const i1 = Math.floor((T.length - 1) * (c + 1) / CHUNKS);
+          if (i1 <= i0) continue;
+          ctx.globalAlpha = ((c + 1) / CHUNKS) * pass.alpha;
+          ctx.beginPath();
+          ctx.moveTo(T[i0].x, T[i0].y + pass.dy);
+          for (let i = i0 + 1; i <= i1; i++) ctx.lineTo(T[i].x, T[i].y + pass.dy);
+          ctx.stroke();
+        }
       }
       ctx.globalAlpha = 1;
     }
@@ -541,7 +635,7 @@ class Game {
       drawPlayerShadow(ctx, p, this.terrain, theme);
 
       // translucent afterimages once you're really flying
-      const ghost = clamp((p.speed - 850) / 700, 0, 1);
+      const ghost = this.detail ? clamp((p.speed - 850) / 700, 0, 1) : 0;
       if (ghost > 0 && (p.state === 'ground' || p.state === 'air')) {
         const taps = [[8, 0.20], [5, 0.12], [2, 0.06]];
         for (const [back, alpha] of taps) {
@@ -560,10 +654,15 @@ class Game {
       drawAvalanche(ctx, this.avalanche, this.terrain, theme, left, this.time);
     }
 
-    // particles
+    // particles: soft halo + brighter core so powder reads as puffs, not dots
     for (const pt of this.particles) {
-      ctx.globalAlpha = clamp(pt.life / pt.maxLife, 0, 1);
+      const a = clamp(pt.life / pt.maxLife, 0, 1);
       ctx.fillStyle = pt.color;
+      ctx.globalAlpha = a * 0.28;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, pt.size * 1.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = a;
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
       ctx.fill();
@@ -590,7 +689,7 @@ class Game {
     }
 
     // faint speed streaks once you're really moving
-    if (!this.demo && this.player.speed > 1050 && this.state === 'playing') {
+    if (this.detail && !this.demo && this.player.speed > 1050 && this.state === 'playing') {
       const boost = clamp((this.player.speed - 1050) / 900, 0, 1);
       ctx.strokeStyle = '#ffffff';
       ctx.lineCap = 'round';
@@ -618,6 +717,10 @@ class Game {
     }
     ctx.fillStyle = this._vig;
     ctx.fillRect(0, 0, w, h);
+
+    if (!this.demo && this.settings.hazardMarkers && (this.state === 'playing' || this.state === 'paused')) {
+      this.drawHazardMarkers(ctx, w, h);
+    }
 
     if (this.state === 'playing' && !this.demo) {
       const dist = this.avalanche.distanceTo(this.player);
